@@ -1,17 +1,21 @@
-import express from 'express';
-import cors from 'cors';
 import dotenv from 'dotenv';
-
 dotenv.config();
 
+import express from 'express';
+import cors from 'cors';
+
+
+import moviesRouter from '../backend/src/routes/movies';
+
+
 const app = express();
+const PORT = process.env.PORT || 5000;
+
 app.use(cors());
+app.use(express.json());
 
-app.get('/', (req, res) => {
-  res.json({ message: 'Bingefy API is running' });
-});
+app.use('/api/movies', moviesRouter);
 
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`API running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
