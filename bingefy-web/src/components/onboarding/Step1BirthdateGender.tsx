@@ -5,7 +5,6 @@ import { useAuth } from "../../contexts/AuthContext";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 
-// Utility to check if age ≥ 16
 function isAtLeast16(birthdateISO: string): boolean {
   const today = new Date();
   const [year, month, day] = birthdateISO.split("-").map((s) => parseInt(s, 10));
@@ -19,9 +18,9 @@ function isAtLeast16(birthdateISO: string): boolean {
 }
 
 export function Step1BirthdateGender() {
-  const { user, username } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const [birthdate, setBirthdate] = useState(""); // “YYYY-MM-DD”
+  const [birthdate, setBirthdate] = useState("");
   const [gender, setGender] = useState<"Male" | "Female" | "Other" | "">("");
   const [error, setError] = useState<string | null>(null);
 
@@ -37,8 +36,6 @@ export function Step1BirthdateGender() {
       setError("You must be at least 16 years old to use this service.");
       return;
     }
-
-    // At this point, user is ≥16. So write birthdate + gender to Firestore under users/{uid}
     if (!user) {
       setError("User not found. Please log in again.");
       return;
@@ -50,9 +47,9 @@ export function Step1BirthdateGender() {
         birthdate,
         gender: gender || null,
       });
-      // Proceed to step2 (Show selection)
+      // Immediately redirect to step2. On next login, the OnboardingGate sees birthdate is set
       navigate("/onboarding/step2");
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       setError("Failed to save your birthdate/gender. Please try again.");
     }

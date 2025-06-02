@@ -4,25 +4,25 @@ import {
   BrowserRouter,
   Routes,
   Route,
-  Navigate,
   Link,
-  useLocation,
   useNavigate,
 } from "react-router-dom";
 import { SignUp } from "./components/SignUp";
 import { Login } from "./components/Login";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { useAuth } from "./contexts/AuthContext";
-import { getDoc, doc } from "firebase/firestore";
+
+import { doc, getDoc } from "firebase/firestore";
 import { db } from "./firebase";
 
+// Your main “tabs” pages
 import { TabsLayout } from "./components/TabsLayout";
 import { ShowsPage } from "./components/ShowsPage";
 import { MoviesPage } from "./components/MoviesPage";
 import { ExplorePage } from "./components/ExplorePage";
 import { ProfilePage } from "./components/ProfilePage";
 
-// Import your onboarding steps:
+// Onboarding steps:
 import { Step1BirthdateGender } from "./components/onboarding/Step1BirthdateGender";
 import { Step2PickShows } from "./components/onboarding/Step2PickShows";
 import { Step3WatchedMovies } from "./components/onboarding/Step3WatchedMovies";
@@ -35,40 +35,45 @@ function App() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // We need to track if Firestore says this user has completed onboarding:
-  const [profileLoaded, setProfileLoaded] = useState(false);
-  const [onboarded, setOnboarded] = useState<boolean | null>(null);
+  // We’ll load the Firestore user doc once they're signed in:
+  const [profileData, setProfileData] = useState<null | {
+    birthdate?: string;
+    gender?: string | null;
+    showsOnboarded?: number[];
+    moviesWatched?: number[];
+    moviesToWatch?: number[];
+    onboarded?: boolean;
+  }>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
 
-  // If user signs in (or refreshes while logged in), fetch their “users/{uid}” doc:
   useEffect(() => {
-    async function fetchProfile() {
-      if (user) {
-        const docRef = doc(db, "users", user.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setOnboarded(Boolean(data.onboarded));
-        } else {
-          // It’s possible the “users/{uid}” doc doesn’t exist yet (no onboarding touched)
-          setOnboarded(false);
-        }
-      } else {
-        // If not logged in, we don’t care about onboarding
-        setOnboarded(null);
-      }
-      setProfileLoaded(true);
+    if (!user) {
+      setProfileData(null);
+      setLoadingProfile(false);
+      return;
     }
-    fetchProfile();
+    // Fetch the user’s Firestore doc at /users/{uid}:
+    (async () => {
+      setLoadingProfile(true);
+      const docRef = doc(db, "users", user.uid);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        setProfileData(snap.data() as any);
+      } else {
+        setProfileData({});
+      }
+      setLoadingProfile(false);
+    })();
   }, [user]);
 
-  // Hide the top header on /login or /signup:
+  // Hide header on /login or /signup
   const hideHeader = location.pathname.startsWith("/login") || location.pathname.startsWith("/signup");
 
-  // While we’re loading the user profile from Firestore, show a spinner:
-  if (user && !profileLoaded) {
+  // If the user is signed in but we haven’t loaded Firestore data yet, show a loading spinner:
+  if (user && loadingProfile) {
     return (
       <div style={{ color: "#fff", textAlign: "center", marginTop: "3rem" }}>
-        Loading profile…
+        Loading your profile…
       </div>
     );
   }
@@ -104,22 +109,21 @@ function App() {
 
       <main style={{ height: hideHeader ? "100vh" : "auto" }}>
         <Routes>
-          {/* Unauthenticated routes */}
+          {/* Public: signup / login */}
           <Route path="/signup" element={<SignUp />} />
           <Route path="/login" element={<Login />} />
 
-          {/* RequireAuth wraps everything under "/" */}
+          {/* All routes under "/" require auth + onboarding */}
           <Route
             path="/"
             element={
               <ProtectedRoute>
-                <RequireOnboarding onboarded={onboarded}>
+                <OnboardingGate profileData={profileData}>
                   <TabsLayout />
-                </RequireOnboarding>
+                </OnboardingGate>
               </ProtectedRoute>
             }
           >
-            {/* If already onboarded, default to “shows” */}
             <Route index element={<Navigate to="shows" replace />} />
             <Route path="shows" element={<ShowsPage />} />
             <Route path="movies" element={<MoviesPage />} />
@@ -127,7 +131,7 @@ function App() {
             <Route path="profile" element={<ProfilePage />} />
           </Route>
 
-          {/* Onboarding wizard steps (only visible if user not onboarded) */}
+          {/* Onboarding wizard: only accessible if not fully onboarded */}
           <Route
             path="/onboarding"
             element={
@@ -152,25 +156,65 @@ function App() {
 
 export default App;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// COMPONENT: RequireOnboarding
-// If onboarded===false, redirect the user into /onboarding/step1.
-// If onboarded===true, show the normal “tabs” layout. If null (not logged in), do nothing here.
-// ─────────────────────────────────────────────────────────────────────────────
+/** 
+ * OnboardingGate inspects profileData (fetched from Firestore). 
+ * It enforces STEP 1 → STEP 2 → STEP 3 → STEP 4 → DONE.
+ */
 import type { ReactNode } from "react";
-function RequireOnboarding({ onboarded, children }: { onboarded: boolean | null; children: ReactNode }) {
+import { Navigate, useLocation } from "react-router-dom";
+
+function OnboardingGate({
+  profileData,
+  children,
+}: {
+  profileData: {
+    birthdate?: string;
+    gender?: string | null;
+    showsOnboarded?: number[];
+    moviesWatched?: number[];
+    moviesToWatch?: number[];
+    onboarded?: boolean;
+  } | null;
+  children: ReactNode;
+}) {
   const location = useLocation();
-  if (onboarded === false) {
-    // If the user isn’t onboarded yet, send them into step1 (birthdate/gender)
+
+  // If profileData is null, or user not signed in, just render children
+  if (profileData === null) {
+    return <>{children}</>;
+  }
+
+  // If they already completed all steps (onboarded===true), show the app
+  if (profileData.onboarded) {
+    return <>{children}</>;
+  }
+
+  // STEP 1: If no birthdate, send to /onboarding/step1
+  if (!profileData.birthdate) {
     return <Navigate to="/onboarding/step1" state={{ from: location }} replace />;
   }
-  // If onboarded===true (or user===null, meaning not signed in), just render children
+
+  // STEP 2: If birthdate exists but no showsOnboarded, /onboarding/step2
+  if (!profileData.showsOnboarded) {
+    return <Navigate to="/onboarding/step2" state={{ from: location }} replace />;
+  }
+
+  // STEP 3: If showsOnboarded exists but no moviesWatched, /onboarding/step3
+  if (!profileData.moviesWatched) {
+    return <Navigate to="/onboarding/step3" state={{ from: location }} replace />;
+  }
+
+  // STEP 4: If moviesWatched exists but no moviesToWatch, /onboarding/step4
+  if (!profileData.moviesToWatch) {
+    return <Navigate to="/onboarding/step4" state={{ from: location }} replace />;
+  }
+
+  // Otherwise (all steps done but onboarded not yet flagged), let Step4 set onboarded=true
   return <>{children}</>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// COMPONENT: OnboardingLayout
-// A shared layout around each onboarding step (centered card, progress indicator, etc.)
+// OnboardingLayout: same as before—puts a card & progress bar around each step
 // ─────────────────────────────────────────────────────────────────────────────
 import { Outlet } from "react-router-dom";
 
@@ -180,7 +224,6 @@ function OnboardingLayout() {
       <div style={onboardStyles.overlay} />
       <div style={onboardStyles.centerContainer}>
         <div style={onboardStyles.card}>
-          {/* A simple “progress” indicator */}
           <h2 style={onboardStyles.heading}>Tell us about yourself</h2>
           <Outlet />
         </div>
