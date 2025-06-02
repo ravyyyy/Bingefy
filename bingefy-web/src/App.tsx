@@ -1,16 +1,21 @@
+// src/App.tsx
 import React from "react";
 import { Routes, Route, Navigate, Link, useLocation } from "react-router-dom";
 import { SignUp } from "./components/SignUp";
 import { Login } from "./components/Login";
 import { ProtectedRoute } from "./components/ProtectedRoute";
-import { PopularMovies } from "./components/PopularMovies";
+import { TabsLayout } from "./components/TabsLayout";
+import { ShowsPage } from "./components/ShowsPage";
+import { MoviesPage } from "./components/MoviesPage";
+import { ExplorePage } from "./components/ExplorePage";
+import { ProfilePage } from "./components/ProfilePage";
 import { useAuth } from "./contexts/AuthContext";
 
 function App() {
   const { user, logOut } = useAuth();
   const location = useLocation();
 
-  // If we are on /signup or /login, hide the header and the padding
+  // Hide header when on /login or /signup
   const hideHeader = location.pathname === "/signup" || location.pathname === "/login";
 
   return (
@@ -18,8 +23,6 @@ function App() {
       style={{
         background: "#121212",
         minHeight: "100vh",
-        // DON'T add paddingTop when hideHeader === true,
-        // otherwise AuthLayout can fill the whole viewport
         paddingTop: hideHeader ? 0 : "1rem",
       }}
     >
@@ -29,9 +32,9 @@ function App() {
           <nav>
             {user ? (
               <>
-                <span style={headerStyles.welcome}>Salut, {user?.email}</span>
+                <span style={headerStyles.welcome}>Hello, {user.email}</span>
                 <button onClick={logOut} style={headerStyles.logoutButton}>
-                  Ieși
+                  Sign Out
                 </button>
               </>
             ) : (
@@ -50,16 +53,28 @@ function App() {
 
       <main style={{ height: hideHeader ? "100vh" : "auto" }}>
         <Routes>
+          {/* Protect everything under “/” */}
           <Route
             path="/"
             element={
               <ProtectedRoute>
-                <PopularMovies />
+                <TabsLayout />
               </ProtectedRoute>
             }
-          />
+          >
+            {/* Default to “shows” when at “/” */}
+            <Route index element={<Navigate to="shows" replace />} />
+            <Route path="shows" element={<ShowsPage />} />
+            <Route path="movies" element={<MoviesPage />} />
+            <Route path="explore" element={<ExplorePage />} />
+            <Route path="profile" element={<ProfilePage />} />
+          </Route>
+
+          {/* Authentication routes */}
           <Route path="/signup" element={<SignUp />} />
           <Route path="/login" element={<Login />} />
+
+          {/* Catch-all → redirect to / */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
