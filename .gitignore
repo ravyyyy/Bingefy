@@ -1,33 +1,65 @@
-# Node modules - nu urcă folderul cu module instalate
+# ─────────────────────────────────────────────────────────────────────────────
+# 1. Node.js / JavaScript
+# ─────────────────────────────────────────────────────────────────────────────
 node_modules/
-
-# Fișiere de build / compilare TypeScript
-dist/
-build/
-
-# Fișiere de tip cache
-*.tsbuildinfo
-
-# Environment variables - fișierul cu variabilele de mediu (secret)
-.env
-
-# Logs
-logs/
-*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
-# Director temporar de debugging
-*.tscache
+# Lockfiles (optional)
+/package-lock.json
+/yarn.lock
 
-# VSCode workspace settings
+# ─────────────────────────────────────────────────────────────────────────────
+# 2. Vite / Build directories
+# ─────────────────────────────────────────────────────────────────────────────
+dist/
+.vite/
+build/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 3. Environment / Credentials
+# ─────────────────────────────────────────────────────────────────────────────
+# Ignore any file that starts with .env (e.g. .env, .env.local, .env.production)
+.env
+.env.*
+!.env.example
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 4. Log files
+# ─────────────────────────────────────────────────────────────────────────────
+*.log
+logs/
+*.log.*
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5. IDE / Editor directories and files
+# ─────────────────────────────────────────────────────────────────────────────
 .vscode/
+.idea/
+*.iml
+out/
 
-# Sistem de operare (Windows/Mac/Linux) fișiere temporare
+# Vim
+*.swp
+*.swo
+
+# Emacs
+*~
+
+# Sublime
+*.sublime-workspace
+*.sublime-project
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 6. OS‐specific files
+# ─────────────────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 
-# Alte fișiere temporare, editor
-*.swp
-*.swo
+# ─────────────────────────────────────────────────────────────────────────────
+# 7. Miscellaneous
+# ─────────────────────────────────────────────────────────────────────────────
+coverage/
+*.cache/
