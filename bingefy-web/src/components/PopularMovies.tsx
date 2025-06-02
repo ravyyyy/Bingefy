@@ -20,7 +20,7 @@ export function PopularMovies() {
         setMediaItems(resp.results);
         setTotalPages(resp.total_pages);
       } catch (e: any) {
-        setError("Nu am putut încărca media recenta.");
+        setError("Couldn't load the recent media.");
       } finally {
         setLoading(false);
       }
@@ -28,18 +28,18 @@ export function PopularMovies() {
   }, [page]);
 
   if (loading) {
-    return <p style={styles.message}>Se încarcă ultimele filme și seriale…</p>;
+    return <p style={styles.message}>Loading last movies and tv shows...</p>;
   }
   if (error) {
     return <p style={{ ...styles.message, color: "salmon" }}>{error}</p>;
   }
   if (mediaItems.length === 0) {
-    return <p style={styles.message}>Nu s-au găsit filme sau seriale noi.</p>;
+    return <p style={styles.message}>Couldn't find new movies or tv shows.</p>;
   }
 
   return (
     <div style={{ padding: "1rem" }}>
-      <h2 style={styles.heading}>Filme și seriale recent adăugate</h2>
+      <h2 style={styles.heading}>Movies and tv shows recently added</h2>
       <div style={styles.grid}>
         {mediaItems.map((item) => (
           <div key={`${item.type}-${item.id}`} style={styles.card}>
@@ -50,13 +50,13 @@ export function PopularMovies() {
                 style={styles.poster}
               />
             ) : (
-              <div style={styles.noPoster}>Fără poster</div>
+              <div style={styles.noPoster}>No poster</div>
             )}
             <div style={styles.info}>
               <h3 style={styles.title}>{item.title}</h3>
               <p style={styles.rating}>⭐ {item.vote_average.toFixed(1)}</p>
               <p style={styles.typeLabel}>
-                {item.type === "movie" ? "Film" : "Serial"}
+                {item.type === "movie" ? "Movie" : "TV Show"}
               </p>
             </div>
           </div>

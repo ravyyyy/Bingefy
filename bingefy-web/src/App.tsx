@@ -10,7 +10,7 @@ function App() {
   const { user, logOut } = useAuth();
   const location = useLocation();
 
-  // Dacă suntem pe /signup sau /login, ascundem header-ul și padding-ul
+  // If we are on /signup or /login, hide the header and the padding
   const hideHeader = location.pathname === "/signup" || location.pathname === "/login";
 
   return (
@@ -18,8 +18,8 @@ function App() {
       style={{
         background: "#121212",
         minHeight: "100vh",
-        // NU punem paddingTop atunci când hideHeader === true,
-        // astfel AuthLayout poate umple întregul viewport
+        // DON'T add paddingTop when hideHeader === true,
+        // otherwise AuthLayout can fill the whole viewport
         paddingTop: hideHeader ? 0 : "1rem",
       }}
     >

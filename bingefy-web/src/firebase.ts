@@ -9,7 +9,6 @@ import {
   type User,
 } from "firebase/auth";
 
-// These env keys come from .env and are NOT committed
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string,

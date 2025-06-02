@@ -1,4 +1,4 @@
-/* Reset de bază */
+/* Base reset */
 * {
   margin: 0;
   padding: 0;
@@ -13,7 +13,7 @@ body {
   overflow-x: hidden;
 }
 
-/* Scrollbar personalizat */
+/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
 }
@@ -25,52 +25,43 @@ body {
   background-color: #121212;
 }
 
-/* Titluri */
+/* Titles */
 h1,
 h2,
 h3 {
   font-weight: 600;
 }
 
-/* Link-uri */
+/* Links */
 a {
   color: inherit;
   text-decoration: none;
 }
 
-/* Butoane */
+/* Buttons */
 button {
   font-family: inherit;
 }
 
-/* Clasa utilitară de centrare */
+/* Utilitary class for centering */
 .text-center {
   text-align: center;
 }
 
-/* PopularMovies grid (dacă vrei să folosești) */
+/* PopularMovies grid */
 .movie-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 1rem;
 }
 
-/* Formular Global */
+/* Global Formular */
 input,
 button {
   outline: none;
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   Stiluri pentru animația fundalului AuthLayout:
-   1) Containerul tuturor rândurilor
-   2) Fiecare rând (lățime: 200%, înălțime: 15vh)
-   3) Celulele poster afișate integral, cu aspect ratio 2:3
-   4) Overlay
-   5) Keyframe-ul „Full Scroll” (0→-100% pentru toate rândurile)
-   ───────────────────────────────────────────────────────────────────────────── */
-
-/* Containerul ce cuprinde toate rândurile */
+/* The container which has all the rows */
 .rowsContainer {
   position: absolute;
   top: 0;
@@ -80,35 +71,34 @@ button {
   overflow: hidden;
 }
 
-/* Fiecare rând este un flex cu lățime dublă */
+/* Each row is a flex with double width */
 .row {
   display: flex;
   white-space: nowrap;
   position: relative;
-  width: 200%;       /* dublăm spațiul pentru animație continuă */
+  width: 200%;
   overflow: hidden;
-  /* Ne bazăm pe keyframe pentru a porni de la translateX(0) */
 }
 
-/* Înălțimea fiecărui rând = 15vh (pentru postere mari și lizibile) */
+/* The heigh for each row = 15vh */
 .row:nth-child(n) {
   height: 15vh;
 }
 
-/* Fiecare poster afișează imaginea completă, fără decupare */
+/* Each poster shows the whole image */
 .posterCell {
-  height: 100%;                          /* ocupă cei 15vh ai rândului */
-  width: calc((15vh) * (2 / 3));         /* raport 2:3 (≈ 10vh lățime) */
-  background-size: contain;              /* afișăm posterul întreg */
-  background-repeat: no-repeat;          /* fără repetare */
-  background-position: center center;    /* centrat */
-  flex-shrink: 0;                        /* nu se micșorează */
+  height: 100%;                          
+  width: calc((15vh) * (2 / 3));         
+  background-size: contain;            
+  background-repeat: no-repeat;       
+  background-position: center center;    
+  flex-shrink: 0;                        
   filter: brightness(0.6);
   margin-right: 8px;
   border-radius: 4px;
 }
 
-/* Overlay întunecat */
+/* Dark overlay */
 .overlay {
   position: absolute;
   top: 0;
@@ -119,20 +109,12 @@ button {
   z-index: 1;
 }
 
-/* Animație „Full Scroll” 0%→-100% în 80s, linear, infinite */
+/* „Full Scroll” animation 0%→-100% in 80s, linear, infinite */
 @keyframes moveLeftFull {
   0% {
-    transform: translateX(0);       /* afișează primele 30 postere din stânga complet */
+    transform: translateX(0);       
   }
   100% {
-    transform: translateX(-100%);   /* deplasare completă spre stânga */
+    transform: translateX(-100%);   
   }
 }
-
-/* OBSERVAȚIE: Toate rândurile (0,1,2,3…) rulează același keyframe:
-   • .row { animation: moveLeftFull 80s linear infinite; }
-   Astfel:
-   – La încărcare, browser-ul aplică starea 0% a keyframe-ului (translateX(0)) → primele 30 postere pe fiecare rând.  
-   – În următoarele 80s, fiecare rând se deplasează spre stânga, parcurgând 60 postere (de două ori ITEMS_PER_ROW).  
-   – La 100% → translateX(-100%), reset la 0 și începe iar, fără goluri.  
-   – Toate rândurile sunt sincronizate: toate încep în același moment, afișând primele 30 postere, apoi rulează în paralel. */

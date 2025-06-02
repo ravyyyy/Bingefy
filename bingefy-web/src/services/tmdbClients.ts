@@ -37,7 +37,7 @@ export async function getLatestMovies(page: number = 1): Promise<TmdbResponse<Mo
 
   const response = await fetch(url.toString());
   if (!response.ok) {
-    throw new Error(`Eroare TMDB (latest movies): ${response.status}`);
+    throw new Error(`TMDB Error (latest movies): ${response.status}`);
   }
   return (await response.json()) as TmdbResponse<Movie>;
 }
@@ -51,7 +51,7 @@ export async function getLatestTV(page: number = 1): Promise<TmdbResponse<TVShow
 
   const response = await fetch(url.toString());
   if (!response.ok) {
-    throw new Error(`Eroare TMDB (latest tv): ${response.status}`);
+    throw new Error(`TMDB Error (latest tv): ${response.status}`);
   }
   return (await response.json()) as TmdbResponse<TVShow>;
 }
@@ -84,7 +84,7 @@ export async function getLatestMedia(
 
   const tvItems: MediaItem[] = tvResp.results.map((t) => ({
     id: t.id,
-    title: t.name, // „name” devine titlu
+    title: t.name, // „name” becomes title
     overview: t.overview,
     poster_path: t.poster_path,
     vote_average: t.vote_average,

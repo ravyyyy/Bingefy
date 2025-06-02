@@ -3,11 +3,11 @@ import { getLatestMedia, type MediaItem } from "../services/tmdbClients";
 
 const POSTER_BASE_URL = "https://image.tmdb.org/t/p/w200";
 
-// Câte postere afișăm pe un rând (mai puține → postere mai mari)
+// Posters on a row (the less → bigger posters)
 const ITEMS_PER_ROW = 30;
 
-// Câte pagini TMDB să încărcăm
-const PAGES_TO_FETCH = 30; // ~2400 de elemente
+// How many TMDB pages to load
+const PAGES_TO_FETCH = 30; // ~2400 elements
 
 type AuthLayoutProps = {
   children: React.ReactNode;
@@ -23,16 +23,16 @@ export function AuthLayout({ children }: AuthLayoutProps) {
         const promises = pagesToFetch.map((p) => getLatestMedia(p));
         const results = await Promise.all(promises);
 
-        // Combinăm toate filmele și serialele într-un singur array
+        // Combine all movies and tv shows in a single array
         const allMedia = results.flatMap((r) => r.results);
         setBackgroundMedia(allMedia);
       } catch (err) {
-        console.error("Eroare la încărcarea fundalului:", err);
+        console.error("Background loading error:", err);
       }
     })();
   }, []);
 
-  // Împărțim backgroundMedia în „rânduri” de câte ITEMS_PER_ROW
+  // Split backgroundMedia in „rows” each of ITEMS_PER_ROW
   const rows: MediaItem[][] = [];
   for (let i = 0; i < backgroundMedia.length; i += ITEMS_PER_ROW) {
     rows.push(backgroundMedia.slice(i, i + ITEMS_PER_ROW));
@@ -42,10 +42,10 @@ export function AuthLayout({ children }: AuthLayoutProps) {
     <div style={styles.fullscreenContainer}>
       <div className="rowsContainer">
         {rows.map((rowItems, rowIndex) => {
-          // Duplicăm array-ul astfel încât să avem 2×30 = 60 postere per rând
+          // Duplicate the array so we have 2×30 = 60 posters per row
           const duplicated = [...rowItems, ...rowItems];
 
-          // În loc să alternăm, folosim același keyframe pentru TOATE rândurile:
+          // Instead of alternating, we use the same keyframe for ALL rows:
           const animationStyle = `moveLeftFull 80s linear infinite`;
 
           return (
@@ -54,7 +54,6 @@ export function AuthLayout({ children }: AuthLayoutProps) {
               key={rowIndex}
               style={{
                 animation: animationStyle,
-                // NU mai setăm niciun transform inline – keyframe-ul pornește de la 0% cu translateX(0)
               }}
             >
               {duplicated.map((item, idx) =>
