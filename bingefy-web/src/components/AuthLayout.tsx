@@ -1,13 +1,11 @@
+// src/components/AuthLayout.tsx
 import React, { useEffect, useState } from "react";
 import { getLatestMedia, type MediaItem } from "../services/tmdbClients";
+import logoSrc from "../assets/bingefy_text_logo.png";
 
 const POSTER_BASE_URL = "https://image.tmdb.org/t/p/w200";
-
-// Posters on a row (the less → bigger posters)
 const ITEMS_PER_ROW = 30;
-
-// How many TMDB pages to load
-const PAGES_TO_FETCH = 30; // ~2400 elements
+const PAGES_TO_FETCH = 30;
 
 type AuthLayoutProps = {
   children: React.ReactNode;
@@ -22,8 +20,6 @@ export function AuthLayout({ children }: AuthLayoutProps) {
         const pagesToFetch = Array.from({ length: PAGES_TO_FETCH }, (_, i) => i + 1);
         const promises = pagesToFetch.map((p) => getLatestMedia(p));
         const results = await Promise.all(promises);
-
-        // Combine all movies and tv shows in a single array
         const allMedia = results.flatMap((r) => r.results);
         setBackgroundMedia(allMedia);
       } catch (err) {
@@ -32,7 +28,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
     })();
   }, []);
 
-  // Split backgroundMedia in „rows” each of ITEMS_PER_ROW
+  // Split into rows
   const rows: MediaItem[][] = [];
   for (let i = 0; i < backgroundMedia.length; i += ITEMS_PER_ROW) {
     rows.push(backgroundMedia.slice(i, i + ITEMS_PER_ROW));
@@ -42,19 +38,14 @@ export function AuthLayout({ children }: AuthLayoutProps) {
     <div style={styles.fullscreenContainer}>
       <div className="rowsContainer">
         {rows.map((rowItems, rowIndex) => {
-          // Duplicate the array so we have 2×30 = 60 posters per row
           const duplicated = [...rowItems, ...rowItems];
-
-          // Instead of alternating, we use the same keyframe for ALL rows:
           const animationStyle = `moveLeftFull 80s linear infinite`;
 
           return (
             <div
               className="row"
               key={rowIndex}
-              style={{
-                animation: animationStyle,
-              }}
+              style={{ animation: animationStyle }}
             >
               {duplicated.map((item, idx) =>
                 item.poster_path ? (
@@ -76,7 +67,17 @@ export function AuthLayout({ children }: AuthLayoutProps) {
 
       <div style={styles.centerContainer}>
         <div style={styles.card}>
-          <h1 style={styles.logo}>Bingefy</h1>
+          {/* Inline style to force the logo to be small */}
+          <img
+            src={logoSrc}
+            alt="Bingefy Logo"
+            style={{
+              display: "block",
+              margin: "0 auto 1rem auto",
+              width: "120px",  // ← here is the forced width
+              height: "auto",
+            }}
+          />
           {children}
         </div>
       </div>
@@ -109,13 +110,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     padding: "2rem",
     boxShadow: "0 4px 15px rgba(0, 0, 0, 0.5)",
     color: "#fff",
-  },
-  logo: {
-    margin: 0,
-    marginBottom: "1.5rem",
-    fontSize: "2rem",
-    textAlign: "center" as const,
-    fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
-    letterSpacing: "2px",
+    textAlign: "center",
   },
 };
