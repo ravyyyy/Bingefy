@@ -7,27 +7,40 @@ export function TabsLayout() {
     <div style={styles.outerContainer}>
       {/* 1) Top tab bar */}
       <nav style={styles.tabBar}>
-        {/* NavLink automatically adds an “active” class when the route matches */}
-        <NavLink to="shows" style={({ isActive }) => (isActive ? styles.activeTab : styles.tab)}>
-          {/* You can swap these emojis for actual icons later */}
+        <NavLink
+          to="shows"
+          style={({ isActive }) => (isActive ? styles.activeTab : styles.tab)}
+        >
           <span style={styles.icon}>📺</span>
           <span style={styles.label}>Shows</span>
         </NavLink>
-        <NavLink to="movies" style={({ isActive }) => (isActive ? styles.activeTab : styles.tab)}>
+
+        <NavLink
+          to="movies"
+          style={({ isActive }) => (isActive ? styles.activeTab : styles.tab)}
+        >
           <span style={styles.icon}>🎬</span>
           <span style={styles.label}>Movies</span>
         </NavLink>
-        <NavLink to="explore" style={({ isActive }) => (isActive ? styles.activeTab : styles.tab)}>
+
+        <NavLink
+          to="explore"
+          style={({ isActive }) => (isActive ? styles.activeTab : styles.tab)}
+        >
           <span style={styles.icon}>🔍</span>
           <span style={styles.label}>Explore</span>
         </NavLink>
-        <NavLink to="profile" style={({ isActive }) => (isActive ? styles.activeTab : styles.tab)}>
+
+        <NavLink
+          to="profile"
+          style={({ isActive }) => (isActive ? styles.activeTab : styles.tab)}
+        >
           <span style={styles.icon}>👤</span>
           <span style={styles.label}>Profile</span>
         </NavLink>
       </nav>
 
-      {/* 2) Where the selected tab’s content is rendered */}
+      {/* 2) Content area for whichever tab is active */}
       <div style={styles.contentContainer}>
         <Outlet />
       </div>
@@ -46,7 +59,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     display: "flex",
     justifyContent: "space-around",
     alignItems: "center",
-    height: "56px",
+    height: "64px",               // increased from 56px
     backgroundColor: "#111",
     borderBottom: "1px solid #333",
     zIndex: 10,
@@ -58,10 +71,11 @@ const styles: { [key: string]: React.CSSProperties } = {
     justifyContent: "center",
     color: "#888",
     textDecoration: "none",
-    fontSize: "12px",
-    gap: "2px",
-    width: "25%", // four tabs share equal width
+    fontSize: "14px",             // increased from 12px
+    gap: "4px",                   // a bit more space between icon & label
+    width: "25%",                 // each of four tabs is 25% wide
     height: "100%",
+    transition: "color 0.2s",
   },
   activeTab: {
     display: "flex",
@@ -70,18 +84,20 @@ const styles: { [key: string]: React.CSSProperties } = {
     justifyContent: "center",
     color: "#fff",
     textDecoration: "none",
-    fontSize: "12px",
-    gap: "2px",
+    fontSize: "14px",
+    gap: "4px",
     width: "25%",
     height: "100%",
-    borderBottom: "2px solid #e50914", // red indicator for active tab
+    borderBottom: "3px solid #e50914", // thicker active indicator
+    transition: "color 0.2s, border-bottom 0.2s",
   },
   icon: {
-    fontSize: "20px",
+    fontSize: "28px",             // increased from 20px
     lineHeight: 1,
   },
   label: {
-    fontSize: "10px",
+    fontSize: "14px",             // matches the “fontSize” in tab/activeTab
+    fontWeight: 500,
   },
   contentContainer: {
     flex: 1,

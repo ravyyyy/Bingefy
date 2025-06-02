@@ -1,55 +1,43 @@
+// src/components/Login.tsx
 import React, { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthLayout } from "./AuthLayout";
 
 export function Login() {
-  const { logIn, sendVerification } = useAuth();
+  const { logIn } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+
+  // “identifier” can be either username OR email
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setInfo(null);
-    try {
-      await logIn(email, password);
-      navigate("/");
-    } catch (err: any) {
-      // If the error is “Email not verified…”, show a link to resend
-      if (
-        err.message.includes("Email not verified")
-      ) {
-        setInfo(
-          "Your email is not verified. Check your inbox or"
-        );
-      } else {
-        setError(err.message);
-      }
-    }
-  };
 
-  const handleResend = async () => {
     try {
-      await sendVerification();
-      setInfo("A new verification email has been sent. Please check your inbox.");
+      // Pass identifier (username or email) plus password into logIn
+      await logIn(identifier.trim(), password);
+      navigate("/"); // on success, go to main page
     } catch (err: any) {
-      setError("Could not resend verification email.");
+      setError(err.message);
     }
   };
 
   return (
     <AuthLayout>
       <form onSubmit={handleSubmit} style={formStyles.form}>
-        <label style={formStyles.label}>Email</label>
+        <label style={formStyles.label}>
+          Username or Email
+        </label>
         <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          type="text"
+          value={identifier}
+          onChange={(e) => setIdentifier(e.target.value)}
           required
+          placeholder="Enter your username or email"
           style={formStyles.input}
         />
 
@@ -59,32 +47,21 @@ export function Login() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
+          placeholder="Enter your password"
           style={formStyles.input}
         />
 
         {error && <p style={formStyles.error}>{error}</p>}
 
-        {info && (
-          <p style={formStyles.info}>
-            {info}{" "}
-            <button
-              type="button"
-              onClick={handleResend}
-              style={formStyles.resendButton}
-            >
-              Resend verification email
-            </button>
-          </p>
-        )}
-
         <button type="submit" style={formStyles.button}>
           Log In
         </button>
       </form>
+
       <p style={formStyles.footerText}>
         Don’t have an account?{" "}
         <Link to="/signup" style={formStyles.footerLink}>
-          Sign Up here
+          Sign up here
         </Link>
       </p>
     </AuthLayout>
@@ -125,23 +102,6 @@ const formStyles: { [key: string]: React.CSSProperties } = {
     color: "salmon",
     fontSize: "0.9rem",
     marginTop: "0.5rem",
-  },
-  info: {
-    color: "#fff",
-    fontSize: "0.9rem",
-    marginTop: "0.5rem",
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  resendButton: {
-    background: "none",
-    border: "none",
-    color: "#e50914",
-    cursor: "pointer",
-    fontSize: "0.9rem",
-    textDecoration: "underline",
-    padding: 0,
   },
   footerText: {
     marginTop: "1rem",
