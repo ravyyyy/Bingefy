@@ -255,7 +255,6 @@ const onboardStyles: { [key: string]: React.CSSProperties } = {
     left: "50%",
     transform: "translate(-50%, -50%)",
     width: "100%",
-    maxWidth: "480px",
     padding: "1rem",
     boxSizing: "border-box",
     zIndex: 2,

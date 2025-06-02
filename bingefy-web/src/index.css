@@ -13,7 +13,7 @@ body {
   overflow-x: hidden;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar (for other scrollable areas, if any) */
 ::-webkit-scrollbar {
   width: 8px;
 }
@@ -23,6 +23,14 @@ body {
 }
 ::-webkit-scrollbar-track {
   background-color: #121212;
+}
+
+/* Hide scrollbar on any element with .no-scrollbar */
+.no-scrollbar {
+  scrollbar-width: none; /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Safari/WebKit/Chrome */
 }
 
 /* Titles */
@@ -43,7 +51,7 @@ button {
   font-family: inherit;
 }
 
-/* Utilitary class for centering */
+/* Utility class for centering */
 .text-center {
   text-align: center;
 }
@@ -55,13 +63,17 @@ button {
   gap: 1rem;
 }
 
-/* Global Formular */
+/* Global form elements */
 input,
 button {
   outline: none;
 }
 
-/* The container which has all the rows */
+/* ─────────────────────────────────────────────────────────────────────────────
+   Styles for the background‐animation rows (AuthLayout)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* Container that holds all horizontal rows */
 .rowsContainer {
   position: absolute;
   top: 0;
@@ -71,7 +83,7 @@ button {
   overflow: hidden;
 }
 
-/* Each row is a flex with double width */
+/* Each row is a flex with double width so it can scroll continuously */
 .row {
   display: flex;
   white-space: nowrap;
@@ -80,25 +92,25 @@ button {
   overflow: hidden;
 }
 
-/* The heigh for each row = 15vh */
+/* Height for each row (e.g. 15vh to fit about 6–7 rows in full 100vh) */
 .row:nth-child(n) {
   height: 15vh;
 }
 
-/* Each poster shows the whole image */
+/* Each poster: show the entire image (contain), maintain aspect ratio 2:3 */
 .posterCell {
-  height: 100%;                          
-  width: calc((15vh) * (2 / 3));         
-  background-size: contain;            
-  background-repeat: no-repeat;       
-  background-position: center center;    
-  flex-shrink: 0;                        
+  height: 100%;
+  width: calc((15vh) * (2 / 3)); /* 2:3 aspect ratio */
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center center;
+  flex-shrink: 0;
   filter: brightness(0.6);
   margin-right: 8px;
   border-radius: 4px;
 }
 
-/* Dark overlay */
+/* Dark overlay on top of the animated background */
 .overlay {
   position: absolute;
   top: 0;
@@ -109,12 +121,12 @@ button {
   z-index: 1;
 }
 
-/* „Full Scroll” animation 0%→-100% in 80s, linear, infinite */
+/* “Full Scroll” animation: translateX from 0 → -100% over 80s, looping infinitely */
 @keyframes moveLeftFull {
   0% {
-    transform: translateX(0);       
+    transform: translateX(0);
   }
   100% {
-    transform: translateX(-100%);   
+    transform: translateX(-100%);
   }
 }

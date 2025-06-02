@@ -1,5 +1,6 @@
 // src/components/onboarding/Step2PickShows.tsx
-import React, { useEffect, useState } from "react";
+
+import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { doc, updateDoc } from "firebase/firestore";
@@ -7,7 +8,6 @@ import { db } from "../../firebase";
 import {
   getTrendingShows,
   getPopularShows,
-  type TVShow,
   type MediaItem,
 } from "../../services/tmdbClients";
 
@@ -17,52 +17,88 @@ export function Step2PickShows() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // Now these are MediaItem[], not TVShow[]
   const [trending, setTrending] = useState<MediaItem[]>([]);
-  const [popular, setPopular] = useState<MediaItem[]>([]);
+  const [mostAdded, setMostAdded] = useState<MediaItem[]>([]);
   const [selectedShows, setSelectedShows] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch two rows: trending (row1), popular (row2)
+  // Refs for our two “Trending” rows and two “Most‐Added” rows
+  const trendingRefs = [useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null)];
+  const addedRefs = [useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null)];
+
+  // A ref to detect whether the user actually dragged (so we don’t treat drag as a “click”)
+  const didDragRef = useRef(false);
+
+  // Utility: split an array in half (for two rows)
+  const splitInTwo = <T,>(arr: T[]): [T[], T[]] => {
+    const half = Math.ceil(arr.length / 2);
+    return [arr.slice(0, half), arr.slice(half)];
+  };
+
+  // Load two pages of “Trending” and two pages of “Most‐Added”
   useEffect(() => {
     (async () => {
       try {
-        const trendingResp = await getTrendingShows(1); // returns TVShow[]
-        const popularResp = await getPopularShows(1);   // returns TVShow[]
+        const [t1, t2, p1, p2] = await Promise.all([
+          getTrendingShows(1),
+          getTrendingShows(2),
+          getPopularShows(1),
+          getPopularShows(2),
+        ]);
 
-        // Map each TVShow → MediaItem
-        const trendingMedia: MediaItem[] = trendingResp.results.map(
-          (tv: TVShow) => ({
-            id: tv.id,
-            title: tv.name,
-            overview: tv.overview,
-            poster_path: tv.poster_path,
-            vote_average: tv.vote_average,
-            type: "tv",
-          })
-        );
+        // Convert both pages → a single array of MediaItem (type: "tv")
+        const trendingItems: MediaItem[] = [
+          ...t1.results.map((t) => ({
+            id: t.id,
+            title: t.name,
+            overview: t.overview,
+            poster_path: t.poster_path,
+            vote_average: t.vote_average,
+            type: "tv" as const,
+          })),
+          ...t2.results.map((t) => ({
+            id: t.id,
+            title: t.name,
+            overview: t.overview,
+            poster_path: t.poster_path,
+            vote_average: t.vote_average,
+            type: "tv" as const,
+          })),
+        ];
+        const mostAddedItems: MediaItem[] = [
+          ...p1.results.map((t) => ({
+            id: t.id,
+            title: t.name,
+            overview: t.overview,
+            poster_path: t.poster_path,
+            vote_average: t.vote_average,
+            type: "tv" as const,
+          })),
+          ...p2.results.map((t) => ({
+            id: t.id,
+            title: t.name,
+            overview: t.overview,
+            poster_path: t.poster_path,
+            vote_average: t.vote_average,
+            type: "tv" as const,
+          })),
+        ];
 
-        const popularMedia: MediaItem[] = popularResp.results.map(
-          (tv: TVShow) => ({
-            id: tv.id,
-            title: tv.name,
-            overview: tv.overview,
-            poster_path: tv.poster_path,
-            vote_average: tv.vote_average,
-            type: "tv",
-          })
-        );
-
-        setTrending(trendingMedia);
-        setPopular(popularMedia);
+        setTrending(trendingItems);
+        setMostAdded(mostAddedItems);
       } catch (err) {
         console.error(err);
-        setError("Failed to load shows. Try again.");
+        setError("Failed to load shows. Please try again.");
       }
     })();
   }, []);
 
-  const toggleShow = (id: number) => {
+  // When the user “mouse up” on a poster, only toggle if they did NOT drag
+  const onPosterMouseUp = (id: number) => {
+    if (didDragRef.current) {
+      didDragRef.current = false;
+      return;
+    }
     setSelectedShows((prev) => {
       const copy = new Set(prev);
       if (copy.has(id)) copy.delete(id);
@@ -71,9 +107,10 @@ export function Step2PickShows() {
     });
   };
 
+  // “Next” / “Later” handlers
   const handleNext = async () => {
     if (!user) {
-      setError("User not found. Please log in again.");
+      setError("User not found. Please sign in again.");
       return;
     }
     try {
@@ -84,10 +121,9 @@ export function Step2PickShows() {
       navigate("/onboarding/step3");
     } catch (err) {
       console.error(err);
-      setError("Failed to save your show selections. Try again.");
+      setError("Failed to save your selections. Try again.");
     }
   };
-
   const handleLater = async () => {
     if (!user) return;
     const userDocRef = doc(db, "users", user.uid);
@@ -95,19 +131,85 @@ export function Step2PickShows() {
     navigate("/onboarding/step3");
   };
 
+  // Generic hook: allows click‐and‐drag on a ref to scroll it horizontally
+  function useHorizontalDragScroll(ref: React.RefObject<HTMLDivElement | null>) {
+    useEffect(() => {
+      const element = ref.current!;
+      if (!element) return;
+
+      let isDown = false;
+      let startX = 0;
+      let scrollLeft = 0;
+
+      function onMouseDown(e: MouseEvent) {
+        isDown = true;
+        didDragRef.current = false; // reset at the start of every press
+        startX = e.pageX - element.offsetLeft;
+        scrollLeft = element.scrollLeft;
+        element.classList.add("dragging");
+      }
+      function onMouseLeave() {
+        isDown = false;
+        element.classList.remove("dragging");
+      }
+      function onMouseUp(e: MouseEvent) {
+        // If the user moved more than 5px horizontally, count it as a drag
+        if (isDown && Math.abs(e.pageX - (startX + element.offsetLeft)) > 5) {
+          didDragRef.current = true;
+        }
+        isDown = false;
+        element.classList.remove("dragging");
+      }
+      function onMouseMove(e: MouseEvent) {
+        if (!isDown) return;
+        e.preventDefault();
+        const x = e.pageX - element.offsetLeft;
+        const walk = (x - startX) * 1; // scroll speed factor = 1
+        element.scrollLeft = scrollLeft - walk;
+      }
+
+      element.addEventListener("mousedown", onMouseDown);
+      element.addEventListener("mouseleave", onMouseLeave);
+      element.addEventListener("mouseup", onMouseUp);
+      element.addEventListener("mousemove", onMouseMove);
+
+      return () => {
+        element.removeEventListener("mousedown", onMouseDown);
+        element.removeEventListener("mouseleave", onMouseLeave);
+        element.removeEventListener("mouseup", onMouseUp);
+        element.removeEventListener("mousemove", onMouseMove);
+      };
+    }, [ref]);
+  }
+
+  // Attach drag‐scroll to each row
+  trendingRefs.forEach((r) => useHorizontalDragScroll(r));
+  addedRefs.forEach((r) => useHorizontalDragScroll(r));
+
+  // Split each category into two rows
+  const [trendingRow1, trendingRow2] = splitInTwo(trending);
+  const [addedRow1, addedRow2] = splitInTwo(mostAdded);
+
   return (
-    <div>
+    <div style={styles.container}>
       <p style={styles.instructions}>
         Choose TV shows you’ve watched, are watching, or plan to watch.
       </p>
       {error && <p style={styles.error}>{error}</p>}
 
-      <h3 style={styles.rowTitle}>Trending Shows</h3>
-      <div style={styles.grid}>
-        {trending.map((show) => (
+      {/* ─────────────────────────────────────────────────────────────
+          TRENDING SHOWS – ROW 1
+      ───────────────────────────────────────────────────────────── */}
+      <h3 style={styles.categoryTitle}>Trending Shows</h3>
+      <div
+        ref={trendingRefs[0]}
+        className="no‐scrollbar"
+        style={styles.horizontalRow}
+      >
+        {trendingRow1.map((show) => (
           <div
             key={show.id}
-            onClick={() => toggleShow(show.id)}
+            onMouseUp={() => onPosterMouseUp(show.id)}
             style={{
               ...styles.posterCell,
               opacity: selectedShows.has(show.id) ? 1 : 0.5,
@@ -119,12 +221,65 @@ export function Step2PickShows() {
         ))}
       </div>
 
-      <h3 style={styles.rowTitle}>Most-Added Shows</h3>
-      <div style={styles.grid}>
-        {popular.map((show) => (
+      {/* ─────────────────────────────────────────────────────────────
+          TRENDING SHOWS – ROW 2
+      ───────────────────────────────────────────────────────────── */}
+      <div
+        ref={trendingRefs[1]}
+        className="no‐scrollbar"
+        style={styles.horizontalRow}
+      >
+        {trendingRow2.map((show) => (
           <div
             key={show.id}
-            onClick={() => toggleShow(show.id)}
+            onMouseUp={() => onPosterMouseUp(show.id)}
+            style={{
+              ...styles.posterCell,
+              opacity: selectedShows.has(show.id) ? 1 : 0.5,
+              backgroundImage: show.poster_path
+                ? `url(${POSTER_BASE_URL}${show.poster_path})`
+                : undefined,
+            }}
+          />
+        ))}
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────────
+          MOST‐ADDED SHOWS – ROW 1
+      ───────────────────────────────────────────────────────────── */}
+      <h3 style={styles.categoryTitle}>Most‐Added Shows</h3>
+      <div
+        ref={addedRefs[0]}
+        className="no‐scrollbar"
+        style={styles.horizontalRow}
+      >
+        {addedRow1.map((show) => (
+          <div
+            key={show.id}
+            onMouseUp={() => onPosterMouseUp(show.id)}
+            style={{
+              ...styles.posterCell,
+              opacity: selectedShows.has(show.id) ? 1 : 0.5,
+              backgroundImage: show.poster_path
+                ? `url(${POSTER_BASE_URL}${show.poster_path})`
+                : undefined,
+            }}
+          />
+        ))}
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────────
+          MOST‐ADDED SHOWS – ROW 2
+      ───────────────────────────────────────────────────────────── */}
+      <div
+        ref={addedRefs[1]}
+        className="no‐scrollbar"
+        style={styles.horizontalRow}
+      >
+        {addedRow2.map((show) => (
+          <div
+            key={show.id}
+            onMouseUp={() => onPosterMouseUp(show.id)}
             style={{
               ...styles.posterCell,
               opacity: selectedShows.has(show.id) ? 1 : 0.5,
@@ -149,29 +304,34 @@ export function Step2PickShows() {
 }
 
 const styles: { [key: string]: React.CSSProperties } = {
+  container: {
+    padding: "1rem",
+    color: "#fff",
+  },
   instructions: {
-    color: "#fff",
-    marginBottom: "1rem",
     fontSize: "1rem",
+    marginBottom: "1rem",
   },
-  rowTitle: {
-    color: "#fff",
-    marginTop: "1.5rem",
-    marginBottom: "0.5rem",
+  categoryTitle: {
     fontSize: "1.1rem",
+    margin: "1rem 0 0.5rem 0",
   },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))",
+  horizontalRow: {
+    display: "flex",
     gap: "0.5rem",
+    overflowX: "auto",
+    paddingBottom: "1rem",
+    cursor: "grab",
+    /* We rely on .no‐scrollbar class to hide the scrollbar itself. */
   },
   posterCell: {
-    width: "100%",
-    paddingBottom: "150%", // keep aspect ratio 2:3
+    flex: "0 0 auto",
+    width: "120px",
+    height: "180px",
     backgroundSize: "cover",
     backgroundPosition: "center",
     borderRadius: "4px",
-    cursor: "pointer",
+    transition: "opacity 0.2s",
   },
   buttonsContainer: {
     display: "flex",
