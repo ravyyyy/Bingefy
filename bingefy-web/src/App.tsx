@@ -12,7 +12,7 @@ import { Login } from "./components/Login";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { useAuth } from "./contexts/AuthContext";
 
-import { doc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot, type DocumentData } from "firebase/firestore";
 import { db } from "./firebase";
 
 // Your main “tabs” pages
@@ -35,7 +35,7 @@ function App() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // We’ll load the Firestore user doc once they're signed in:
+  // We'll store { birthdate, gender, …, onboarded } here:
   const [profileData, setProfileData] = useState<null | {
     birthdate?: string;
     gender?: string | null;
@@ -44,32 +44,41 @@ function App() {
     moviesToWatch?: number[];
     onboarded?: boolean;
   }>(null);
+
   const [loadingProfile, setLoadingProfile] = useState(true);
 
   useEffect(() => {
+    // If no user, clear out profileData immediately
     if (!user) {
       setProfileData(null);
       setLoadingProfile(false);
       return;
     }
-    // Fetch the user’s Firestore doc at /users/{uid}:
-    (async () => {
-      setLoadingProfile(true);
-      const docRef = doc(db, "users", user.uid);
-      const snap = await getDoc(docRef);
+
+    setLoadingProfile(true);
+    // Listen in real‐time to /users/{uid}
+    const docRef = doc(db, "users", user.uid);
+    const unsubscribe = onSnapshot(docRef, (snap) => {
       if (snap.exists()) {
-        setProfileData(snap.data() as any);
+        setProfileData(snap.data() as DocumentData);
       } else {
+        // If the user doc doesn't exist yet, treat it as an empty object:
         setProfileData({});
       }
       setLoadingProfile(false);
-    })();
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, [user]);
 
-  // Hide header on /login or /signup
-  const hideHeader = location.pathname.startsWith("/login") || location.pathname.startsWith("/signup");
+  // Hide header when on /login or /signup
+  const hideHeader =
+    location.pathname.startsWith("/login") ||
+    location.pathname.startsWith("/signup");
 
-  // If the user is signed in but we haven’t loaded Firestore data yet, show a loading spinner:
+  // If the user is signed in but we haven’t yet loaded Firestore data, show a loader:
   if (user && loadingProfile) {
     return (
       <div style={{ color: "#fff", textAlign: "center", marginTop: "3rem" }}>

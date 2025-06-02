@@ -17,19 +17,14 @@ export function Step4ToWatchMovies() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
-  // Refs for the two horizontal rows
   const rowRefs = [useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null)];
-
-  // A ref to detect whether the user really dragged (so we don’t toggle on drag)
   const didDragRef = useRef(false);
 
-  // Split an array roughly in half
   const splitInTwo = <T,>(arr: T[]): [T[], T[]] => {
     const half = Math.ceil(arr.length / 2);
     return [arr.slice(0, half), arr.slice(half)];
   };
 
-  // Load two pages of Popular Movies for “to watch”
   useEffect(() => {
     (async () => {
       try {
@@ -65,7 +60,6 @@ export function Step4ToWatchMovies() {
     })();
   }, []);
 
-  // If user releases mouse up on a poster but did not drag, toggle selection
   const onPosterMouseUp = (id: number) => {
     if (didDragRef.current) {
       didDragRef.current = false;
@@ -79,7 +73,6 @@ export function Step4ToWatchMovies() {
     });
   };
 
-  // “Next” → save moviesToWatch + onboarded=true
   const handleNext = async () => {
     if (!user) {
       setError("User not found. Please sign in again.");
@@ -87,17 +80,18 @@ export function Step4ToWatchMovies() {
     }
     try {
       const userDocRef = doc(db, "users", user.uid);
+      // Write the “moviesToWatch” array and mark onboarded = true
       await updateDoc(userDocRef, {
         moviesToWatch: Array.from(selected),
         onboarded: true,
       });
-      navigate("/shows"); // Or whatever your “home” route is
+      // Redirect to “/” so OnboardingGate sees onboarded=true
+      navigate("/", { replace: true });
     } catch {
       setError("Could not save your “to watch” list. Try again.");
     }
   };
 
-  // “Later” → save empty array, onboarded=true
   const handleLater = async () => {
     if (!user) return;
     const userDocRef = doc(db, "users", user.uid);
@@ -105,10 +99,9 @@ export function Step4ToWatchMovies() {
       moviesToWatch: [],
       onboarded: true,
     });
-    navigate("/shows");
+    navigate("/", { replace: true });
   };
 
-  // Generic “click-and-drag” horizontal scroll hook
   function useHorizontalDragScroll(ref: React.RefObject<HTMLDivElement>) {
     useEffect(() => {
       const element = ref.current;
@@ -158,26 +151,18 @@ export function Step4ToWatchMovies() {
     }, [ref]);
   }
 
-  // Attach drag-scroll to each row
   rowRefs.forEach((r) => useHorizontalDragScroll(r));
 
-  // Split movies into two rows
   const [row1, row2] = splitInTwo(movies);
 
   return (
     <div style={styles.container}>
       {/* ─────────── TOP BUTTONS ─────────── */}
       <div style={styles.topButtonsContainer}>
-        <button
-          onClick={handleLater}
-          style={styles.laterButton}
-        >
+        <button onClick={handleLater} style={styles.laterButton}>
           Later
         </button>
-        <button
-          onClick={handleNext}
-          style={styles.nextButton}
-        >
+        <button onClick={handleNext} style={styles.nextButton}>
           Next
         </button>
       </div>
@@ -189,7 +174,11 @@ export function Step4ToWatchMovies() {
       {error && <p style={styles.error}>{error}</p>}
 
       {/* ─────────── MOVIES TO WATCH – ROW 1 ─────────── */}
-      <div ref={rowRefs[0]} className="no-scrollbar" style={styles.horizontalRow}>
+      <div
+        ref={rowRefs[0]}
+        className="no-scrollbar"
+        style={styles.horizontalRow}
+      >
         {row1.map((m) => (
           <div
             key={m.id}
@@ -206,7 +195,11 @@ export function Step4ToWatchMovies() {
       </div>
 
       {/* ─────────── MOVIES TO WATCH – ROW 2 ─────────── */}
-      <div ref={rowRefs[1]} className="no-scrollbar" style={styles.horizontalRow}>
+      <div
+        ref={rowRefs[1]}
+        className="no-scrollbar"
+        style={styles.horizontalRow}
+      >
         {row2.map((m) => (
           <div
             key={m.id}
@@ -224,16 +217,10 @@ export function Step4ToWatchMovies() {
 
       {/* ─────────── BOTTOM BUTTONS (OPTIONAL) ─────────── */}
       <div style={styles.bottomButtonsContainer}>
-        <button
-          onClick={handleLater}
-          style={styles.laterButton}
-        >
+        <button onClick={handleLater} style={styles.laterButton}>
           Later
         </button>
-        <button
-          onClick={handleNext}
-          style={styles.nextButton}
-        >
+        <button onClick={handleNext} style={styles.nextButton}>
           Next
         </button>
       </div>
