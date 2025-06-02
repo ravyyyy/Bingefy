@@ -8,7 +8,6 @@ import {
   logInWithEmail,
   logOut as firebaseLogOut,
   sendEmailVerification,
-  db,
   checkUsernameExists,
   registerUsername,
   lookupEmailByUsername,
@@ -16,10 +15,9 @@ import {
 } from "../firebase";
 import type { User } from "firebase/auth";
 
-// 1) Extend the context to include `username` and a `loginIdentifier` function
 type AuthContextType = {
   user: User | null;
-  username: string | null;    // store the user’s chosen username
+  username: string | null;
   loading: boolean;
   signUp: (username: string, email: string, password: string) => Promise<void>;
   logIn: (identifier: string, password: string) => Promise<void>;
@@ -27,7 +25,6 @@ type AuthContextType = {
   sendVerification: () => Promise<void>;
 };
 
-// 2) Default values for the context (will be overwritten in provider)
 const AuthContext = createContext<AuthContextType>({
   user: null,
   username: null,
@@ -38,19 +35,16 @@ const AuthContext = createContext<AuthContextType>({
   sendVerification: async () => {},
 });
 
-// 3) Provider implementation
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [username, setUsername] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // When Firebase Auth state changes (login, logout, verification, etc.)
   useEffect(() => {
     const unsubscribe = onUserStateChange(async (firebaseUser) => {
       setUser(firebaseUser);
       setLoading(false);
 
-      // If the user is logged in (and email was verified), fetch their username:
       if (firebaseUser) {
         const uid = firebaseUser.uid;
         const uname = await lookupUsernameByUID(uid);
@@ -63,47 +57,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // 4) signUp: enforce unique username → create user → store username → send email verify → sign out
+  //  Updated signUp: create user → register username → send verification → THEN await signOut()
   // ─────────────────────────────────────────────────────────────────────────────
-  const signUp = async (usernameInput: string, email: string, password: string) => {
-    // 1) Trim + lowercase for uniformity
+  const signUp = async (
+    usernameInput: string,
+    email: string,
+    password: string
+  ) => {
+    // 1) trim + lowercase
     const unameKey = usernameInput.trim().toLowerCase();
     if (!unameKey) {
       throw new Error("Username cannot be empty.");
     }
 
-    // 2) Check Firestore if that username already exists
+    // 2) check uniqueness
     const exists = await checkUsernameExists(unameKey);
     if (exists) {
       throw new Error("Username already taken. Please choose another one.");
     }
 
-    // 3) Create the Firebase Auth user
+    // 3) create the Auth user
     const userCredential = await signUpWithEmail(email, password);
     const newUser = userCredential.user;
 
-    // 4) Immediately store username→uid and users→username mapping
+    // 4) immediately write username → { uid, email } & users/{uid} → { username, email }
     await registerUsername(newUser.uid, unameKey, email);
 
-    // 5) Send verification email
+    // 5) send verification email
     await sendEmailVerification(newUser);
 
-    // 6) Sign out the fresh user so they cannot proceed until verified
+    // 6) NOW explicitly sign out and await it before returning
     await firebaseLogOut();
+    // By the time we return, Firebase’s currentUser is null again.
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // 5) logIn: accept either “email” or “username” as identifier
+  //  logIn & logOut & sendVerification (unchanged)
   // ─────────────────────────────────────────────────────────────────────────────
   const logIn = async (identifier: string, password: string) => {
-    // 1) Determine if identifier is an email (contains “@”)
     let emailToUse: string | null = null;
 
     if (identifier.includes("@")) {
-      // User typed an email directly
       emailToUse = identifier.trim();
     } else {
-      // Treat as username → look up the corresponding email in Firestore
       const emailLookup = await lookupEmailByUsername(identifier);
       if (!emailLookup) {
         throw new Error("Username not found.");
@@ -111,25 +107,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       emailToUse = emailLookup;
     }
 
-    // 2) Sign in with the resolved email
     const userCredential = await logInWithEmail(emailToUse, password);
     const loggedInUser = userCredential.user;
 
-    // 3) If email not verified, sign out & throw
     if (!loggedInUser.emailVerified) {
       await firebaseLogOut();
       throw new Error(
         "Email not verified. Please check your inbox for the verification link."
       );
     }
-
-    // If we reach here, login is successful and email is verified.
-    // The onUserStateChange listener will pick up and fetch `username` automatically.
   };
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // 6) logOut & sendVerification
-  // ─────────────────────────────────────────────────────────────────────────────
   const logOut = async () => {
     await firebaseLogOut();
   };

@@ -1,4 +1,5 @@
 // src/components/SignUp.tsx
+
 import React, { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
@@ -6,7 +7,7 @@ import { AuthLayout } from "./AuthLayout";
 
 export function SignUp() {
   const { signUp } = useAuth();
-  const navigate = useNavigate();
+  const navigate = useNavigate(); // we’re not calling navigate here—just showing a message.
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -18,16 +19,12 @@ export function SignUp() {
     e.preventDefault();
     setError(null);
     setInfo(null);
-
     try {
-      // Pass username, email, and password to signUp
-      await signUp(username.trim(), email.trim(), password);
+      await signUp(username, email, password);
       setInfo(
-        "Registration successful! A verification email has been sent. " +
-        "Please verify your email address before logging in."
+        "Thank you for registering! A verification email has been sent. Please check your inbox before logging in."
       );
-      // Optionally, you could navigate to login page after a delay:
-      // setTimeout(() => navigate("/login"), 3000);
+      // We do NOT navigate anywhere. The user remains on the same page so they can read the instructions.
     } catch (err: any) {
       setError(err.message);
     }
@@ -42,9 +39,6 @@ export function SignUp() {
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           required
-          minLength={3}
-          maxLength={20}
-          placeholder="Choose a unique username"
           style={formStyles.input}
         />
 
@@ -54,7 +48,6 @@ export function SignUp() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          placeholder="your@example.com"
           style={formStyles.input}
         />
 
@@ -65,7 +58,6 @@ export function SignUp() {
           onChange={(e) => setPassword(e.target.value)}
           required
           minLength={6}
-          placeholder="At least 6 characters"
           style={formStyles.input}
         />
 
@@ -76,7 +68,6 @@ export function SignUp() {
           Sign Up
         </button>
       </form>
-
       <p style={formStyles.footerText}>
         Already have an account?{" "}
         <Link to="/login" style={formStyles.footerLink}>

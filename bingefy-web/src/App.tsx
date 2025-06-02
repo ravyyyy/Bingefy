@@ -1,4 +1,5 @@
 // src/App.tsx
+
 import React, { useEffect, useState } from "react";
 import {
   BrowserRouter,
@@ -15,7 +16,10 @@ import { useAuth } from "./contexts/AuthContext";
 import { doc, onSnapshot, type DocumentData } from "firebase/firestore";
 import { db } from "./firebase";
 
-// Your main “tabs” pages
+import logoSrc from "./assets/bingefy_text_logo.png";
+
+// Main “tabs” layout, which should render an <Outlet> inside
+// so its nested child routes ("shows", "movies", etc.) appear.
 import { TabsLayout } from "./components/TabsLayout";
 import { ShowsPage } from "./components/ShowsPage";
 import { MoviesPage } from "./components/MoviesPage";
@@ -28,14 +32,12 @@ import { Step2PickShows } from "./components/onboarding/Step2PickShows";
 import { Step3WatchedMovies } from "./components/onboarding/Step3WatchedMovies";
 import { Step4ToWatchMovies } from "./components/onboarding/Step4ToWatchMovies";
 
-import logoSrc from "./assets/bingefy_text_logo.png";
-
 function App() {
   const { user, username, logOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
-  // We'll store { birthdate, gender, …, onboarded } here:
+  // We only load the Firestore “users/{uid}” document once the user is logged in AND emailVerified === true.
   const [profileData, setProfileData] = useState<null | {
     birthdate?: string;
     gender?: string | null;
@@ -44,25 +46,23 @@ function App() {
     moviesToWatch?: number[];
     onboarded?: boolean;
   }>(null);
-
   const [loadingProfile, setLoadingProfile] = useState(true);
 
   useEffect(() => {
-    // If no user, clear out profileData immediately
-    if (!user) {
+    // If there is no user, or user exists but is NOT verified, treat as “not signed in”:
+    if (!user || (user && !user.emailVerified)) {
       setProfileData(null);
       setLoadingProfile(false);
       return;
     }
 
+    // At this point, user.emailVerified === true:
     setLoadingProfile(true);
-    // Listen in real‐time to /users/{uid}
     const docRef = doc(db, "users", user.uid);
     const unsubscribe = onSnapshot(docRef, (snap) => {
       if (snap.exists()) {
         setProfileData(snap.data() as DocumentData);
       } else {
-        // If the user doc doesn't exist yet, treat it as an empty object:
         setProfileData({});
       }
       setLoadingProfile(false);
@@ -73,13 +73,13 @@ function App() {
     };
   }, [user]);
 
-  // Hide header when on /login or /signup
+  // Hide header on /login or /signup
   const hideHeader =
     location.pathname.startsWith("/login") ||
     location.pathname.startsWith("/signup");
 
-  // If the user is signed in but we haven’t yet loaded Firestore data, show a loader:
-  if (user && loadingProfile) {
+  // While Firestore is being fetched for a fully verified user, show a loader:
+  if (user && user.emailVerified && loadingProfile) {
     return (
       <div style={{ color: "#fff", textAlign: "center", marginTop: "3rem" }}>
         Loading your profile…
@@ -88,14 +88,24 @@ function App() {
   }
 
   return (
-    <div style={{ background: "#121212", minHeight: "100vh", paddingTop: hideHeader ? 0 : "1rem" }}>
+    <div
+      style={{
+        background: "#121212",
+        minHeight: "100vh",
+        paddingTop: hideHeader ? 0 : "1rem",
+      }}
+    >
       {!hideHeader && (
         <header style={headerStyles.container}>
           <div style={headerStyles.logoContainer}>
-            <img src={logoSrc} alt="Bingefy Logo" style={headerStyles.logoImage} />
+            <img
+              src={logoSrc}
+              alt="Bingefy Logo"
+              style={headerStyles.logoImage}
+            />
           </div>
           <nav style={headerStyles.nav}>
-            {user ? (
+            {user && user.emailVerified ? (
               <>
                 <span style={headerStyles.welcome}>Hello, {username}</span>
                 <button onClick={logOut} style={headerStyles.logoutButton}>
@@ -118,11 +128,11 @@ function App() {
 
       <main style={{ height: hideHeader ? "100vh" : "auto" }}>
         <Routes>
-          {/* Public: signup / login */}
+          {/* ─────── Public Routes ─────── */}
           <Route path="/signup" element={<SignUp />} />
           <Route path="/login" element={<Login />} />
 
-          {/* All routes under "/" require auth + onboarding */}
+          {/* ─────── Protected + Onboarding Gate ─────── */}
           <Route
             path="/"
             element={
@@ -133,6 +143,7 @@ function App() {
               </ProtectedRoute>
             }
           >
+            {/* Since TabsLayout is the parent element, we define its child routes here */}
             <Route index element={<Navigate to="shows" replace />} />
             <Route path="shows" element={<ShowsPage />} />
             <Route path="movies" element={<MoviesPage />} />
@@ -140,7 +151,7 @@ function App() {
             <Route path="profile" element={<ProfilePage />} />
           </Route>
 
-          {/* Onboarding wizard: only accessible if not fully onboarded */}
+          {/* ─────── Onboarding Routes ─────── */}
           <Route
             path="/onboarding"
             element={
@@ -156,6 +167,7 @@ function App() {
             <Route path="step4" element={<Step4ToWatchMovies />} />
           </Route>
 
+          {/* ─────── Catch‐all ─────── */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
@@ -166,11 +178,11 @@ function App() {
 export default App;
 
 /** 
- * OnboardingGate inspects profileData (fetched from Firestore). 
+ * OnboardingGate inspects `profileData` (fetched from Firestore).
  * It enforces STEP 1 → STEP 2 → STEP 3 → STEP 4 → DONE.
  */
 import type { ReactNode } from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 
 function OnboardingGate({
   profileData,
@@ -188,45 +200,44 @@ function OnboardingGate({
 }) {
   const location = useLocation();
 
-  // If profileData is null, or user not signed in, just render children
+  // 1) If profileData is null, or user is unverified, just render nothing further:
   if (profileData === null) {
     return <>{children}</>;
   }
 
-  // If they already completed all steps (onboarded===true), show the app
+  // 2) If they've already completed all steps, show the app (TabsLayout).
   if (profileData.onboarded) {
     return <>{children}</>;
   }
 
-  // STEP 1: If no birthdate, send to /onboarding/step1
+  // 3) STEP 1: No birthdate → force /onboarding/step1
   if (!profileData.birthdate) {
     return <Navigate to="/onboarding/step1" state={{ from: location }} replace />;
   }
 
-  // STEP 2: If birthdate exists but no showsOnboarded, /onboarding/step2
+  // 4) STEP 2: Birthdate exists but no showsOnboarded → /onboarding/step2
   if (!profileData.showsOnboarded) {
     return <Navigate to="/onboarding/step2" state={{ from: location }} replace />;
   }
 
-  // STEP 3: If showsOnboarded exists but no moviesWatched, /onboarding/step3
+  // 5) STEP 3: showsOnboarded exists but no moviesWatched → /onboarding/step3
   if (!profileData.moviesWatched) {
     return <Navigate to="/onboarding/step3" state={{ from: location }} replace />;
   }
 
-  // STEP 4: If moviesWatched exists but no moviesToWatch, /onboarding/step4
+  // 6) STEP 4: moviesWatched exists but no moviesToWatch → /onboarding/step4
   if (!profileData.moviesToWatch) {
     return <Navigate to="/onboarding/step4" state={{ from: location }} replace />;
   }
 
-  // Otherwise (all steps done but onboarded not yet flagged), let Step4 set onboarded=true
+  // 7) Otherwise, all steps done but onboarded flag not yet written—let Step 4 handle it:
   return <>{children}</>;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// OnboardingLayout: same as before—puts a card & progress bar around each step
-// ─────────────────────────────────────────────────────────────────────────────
-import { Outlet } from "react-router-dom";
-
+/**
+ * OnboardingLayout wraps each step in a dark overlay + centered card.
+ * Step components will render inside <Outlet />.
+ */
 function OnboardingLayout() {
   return (
     <div style={onboardStyles.fullscreenContainer}>
