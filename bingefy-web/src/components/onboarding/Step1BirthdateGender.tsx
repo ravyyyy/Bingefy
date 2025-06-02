@@ -72,7 +72,6 @@ export function Step1BirthdateGender() {
         onChange={(e) => setGender(e.target.value as any)}
         style={styles.input}
       >
-        <option value="">Skip</option>
         <option value="Male">Male</option>
         <option value="Female">Female</option>
         <option value="Other">Other</option>

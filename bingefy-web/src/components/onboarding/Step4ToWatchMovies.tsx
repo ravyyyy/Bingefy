@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
-import { getPopularMovies, type Movie, type MediaItem } from "../../services/tmdbClients";
+import { getPopularMovies, type MediaItem } from "../../services/tmdbClients";
 
 const POSTER_BASE_URL = "https://image.tmdb.org/t/p/w200";
 
@@ -13,48 +13,105 @@ export function Step4ToWatchMovies() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+  const [movies, setMovies] = useState<MediaItem[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
+  // Refs for the two horizontal rows
   const rowRefs = [useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null)];
+
+  // A ref to detect whether the user really dragged (so we don’t toggle on drag)
   const didDragRef = useRef(false);
 
-  // Load ~2 pages of popular movies, convert each Movie→MediaItem
-  useEffect(() => {
-    (async () => {
-      try {
-        const m1 = await getPopularMovies(1);
-        const m2 = await getPopularMovies(2);
-        const combinedMovies: Movie[] = [...m1.results, ...m2.results];
-
-        const items: MediaItem[] = combinedMovies.map((m) => ({
-          id: m.id,
-          title: m.title,
-          overview: m.overview,
-          poster_path: m.poster_path,
-          vote_average: m.vote_average,
-          type: "movie" as const,
-        }));
-        setMediaItems(items);
-      } catch (err) {
-        console.error(err);
-        setError("Failed to load movies. Try again.");
-      }
-    })();
-  }, []);
-
-  // Split array into two rows
+  // Split an array roughly in half
   const splitInTwo = <T,>(arr: T[]): [T[], T[]] => {
     const half = Math.ceil(arr.length / 2);
     return [arr.slice(0, half), arr.slice(half)];
   };
-  const [row1, row2] = splitInTwo(mediaItems);
 
-  // Drag‐to‐scroll hook
-  function useHorizontalDragScroll(ref: React.RefObject<HTMLDivElement | null>) {
+  // Load two pages of Popular Movies for “to watch”
+  useEffect(() => {
+    (async () => {
+      try {
+        const [p1, p2] = await Promise.all([
+          getPopularMovies(1),
+          getPopularMovies(2),
+        ]);
+
+        const items: MediaItem[] = [
+          ...p1.results.map((m) => ({
+            id: m.id,
+            title: m.title,
+            overview: m.overview,
+            poster_path: m.poster_path,
+            vote_average: m.vote_average,
+            type: "movie" as const,
+          })),
+          ...p2.results.map((m) => ({
+            id: m.id,
+            title: m.title,
+            overview: m.overview,
+            poster_path: m.poster_path,
+            vote_average: m.vote_average,
+            type: "movie" as const,
+          })),
+        ];
+
+        setMovies(items);
+      } catch (err) {
+        console.error(err);
+        setError("Failed to load movies. Please try again.");
+      }
+    })();
+  }, []);
+
+  // If user releases mouse up on a poster but did not drag, toggle selection
+  const onPosterMouseUp = (id: number) => {
+    if (didDragRef.current) {
+      didDragRef.current = false;
+      return;
+    }
+    setSelected((prev) => {
+      const copy = new Set(prev);
+      if (copy.has(id)) copy.delete(id);
+      else copy.add(id);
+      return copy;
+    });
+  };
+
+  // “Next” → save moviesToWatch + onboarded=true
+  const handleNext = async () => {
+    if (!user) {
+      setError("User not found. Please sign in again.");
+      return;
+    }
+    try {
+      const userDocRef = doc(db, "users", user.uid);
+      await updateDoc(userDocRef, {
+        moviesToWatch: Array.from(selected),
+        onboarded: true,
+      });
+      navigate("/shows"); // Or whatever your “home” route is
+    } catch {
+      setError("Could not save your “to watch” list. Try again.");
+    }
+  };
+
+  // “Later” → save empty array, onboarded=true
+  const handleLater = async () => {
+    if (!user) return;
+    const userDocRef = doc(db, "users", user.uid);
+    await updateDoc(userDocRef, {
+      moviesToWatch: [],
+      onboarded: true,
+    });
+    navigate("/shows");
+  };
+
+  // Generic “click-and-drag” horizontal scroll hook
+  function useHorizontalDragScroll(ref: React.RefObject<HTMLDivElement>) {
     useEffect(() => {
-      const element = ref.current!;
+      const element = ref.current;
       if (!element) return;
 
       let isDown = false;
@@ -100,54 +157,39 @@ export function Step4ToWatchMovies() {
       };
     }, [ref]);
   }
+
+  // Attach drag-scroll to each row
   rowRefs.forEach((r) => useHorizontalDragScroll(r));
 
-  // onMouseUp toggles only if there was no actual drag
-  const onPosterMouseUp = (id: number) => {
-    if (didDragRef.current) {
-      didDragRef.current = false;
-      return;
-    }
-    setSelected((prev) => {
-      const copy = new Set(prev);
-      if (copy.has(id)) copy.delete(id);
-      else copy.add(id);
-      return copy;
-    });
-  };
-
-  const handleFinish = async () => {
-    if (!user) return;
-    try {
-      const userDocRef = doc(db, "users", user.uid);
-      await updateDoc(userDocRef, {
-        moviesToWatch: Array.from(selected),
-        onboarded: true,
-      });
-      navigate("/shows");
-    } catch {
-      setError("Could not save your “to watch” list. Try again.");
-    }
-  };
-  const handleLater = async () => {
-    if (!user) return;
-    const userDocRef = doc(db, "users", user.uid);
-    await updateDoc(userDocRef, {
-      moviesToWatch: [],
-      onboarded: true,
-    });
-    navigate("/shows");
-  };
+  // Split movies into two rows
+  const [row1, row2] = splitInTwo(movies);
 
   return (
     <div style={styles.container}>
+      {/* ─────────── TOP BUTTONS ─────────── */}
+      <div style={styles.topButtonsContainer}>
+        <button
+          onClick={handleLater}
+          style={styles.laterButton}
+        >
+          Later
+        </button>
+        <button
+          onClick={handleNext}
+          style={styles.nextButton}
+        >
+          Next
+        </button>
+      </div>
+
+      {/* ─────────── INSTRUCTIONS & ERROR ─────────── */}
       <p style={styles.instructions}>
         Choose the movies you want to watch (or click “Later” to finish).
       </p>
       {error && <p style={styles.error}>{error}</p>}
 
-      {/* ROW 1 */}
-      <div ref={rowRefs[0]} className="no‐scrollbar" style={styles.horizontalRow}>
+      {/* ─────────── MOVIES TO WATCH – ROW 1 ─────────── */}
+      <div ref={rowRefs[0]} className="no-scrollbar" style={styles.horizontalRow}>
         {row1.map((m) => (
           <div
             key={m.id}
@@ -163,8 +205,8 @@ export function Step4ToWatchMovies() {
         ))}
       </div>
 
-      {/* ROW 2 */}
-      <div ref={rowRefs[1]} className="no‐scrollbar" style={styles.horizontalRow}>
+      {/* ─────────── MOVIES TO WATCH – ROW 2 ─────────── */}
+      <div ref={rowRefs[1]} className="no-scrollbar" style={styles.horizontalRow}>
         {row2.map((m) => (
           <div
             key={m.id}
@@ -180,12 +222,19 @@ export function Step4ToWatchMovies() {
         ))}
       </div>
 
-      <div style={styles.buttonsContainer}>
-        <button onClick={handleLater} style={styles.laterButton}>
+      {/* ─────────── BOTTOM BUTTONS (OPTIONAL) ─────────── */}
+      <div style={styles.bottomButtonsContainer}>
+        <button
+          onClick={handleLater}
+          style={styles.laterButton}
+        >
           Later
         </button>
-        <button onClick={handleFinish} style={styles.nextButton}>
-          Finish
+        <button
+          onClick={handleNext}
+          style={styles.nextButton}
+        >
+          Next
         </button>
       </div>
     </div>
@@ -197,9 +246,22 @@ const styles: { [key: string]: React.CSSProperties } = {
     padding: "1rem",
     color: "#fff",
   },
+  topButtonsContainer: {
+    display: "flex",
+    justifyContent: "center",
+    gap: "1rem",
+    marginBottom: "1rem",
+  },
+  bottomButtonsContainer: {
+    display: "flex",
+    justifyContent: "center",
+    gap: "1rem",
+    marginTop: "2rem",
+  },
   instructions: {
     fontSize: "1rem",
     marginBottom: "1rem",
+    textAlign: "center",
   },
   horizontalRow: {
     display: "flex",
@@ -216,11 +278,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     backgroundPosition: "center",
     borderRadius: "4px",
     transition: "opacity 0.2s",
-  },
-  buttonsContainer: {
-    display: "flex",
-    justifyContent: "space-between",
-    marginTop: "2rem",
   },
   laterButton: {
     padding: "0.5rem 1rem",
@@ -241,5 +298,6 @@ const styles: { [key: string]: React.CSSProperties } = {
   error: {
     color: "salmon",
     marginBottom: "1rem",
+    textAlign: "center",
   },
 };

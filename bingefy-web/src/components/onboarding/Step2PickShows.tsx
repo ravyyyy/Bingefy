@@ -22,20 +22,20 @@ export function Step2PickShows() {
   const [selectedShows, setSelectedShows] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
-  // Refs for our two “Trending” rows and two “Most‐Added” rows
+  // Refs for the two “Trending” rows and two “Most‐Added” rows
   const trendingRefs = [useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null)];
   const addedRefs = [useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null)];
 
-  // A ref to detect whether the user actually dragged (so we don’t treat drag as a “click”)
+  // A ref to detect whether the user actually dragged (so we don’t toggle on drag)
   const didDragRef = useRef(false);
 
-  // Utility: split an array in half (for two rows)
+  // Utility: split an array roughly in half
   const splitInTwo = <T,>(arr: T[]): [T[], T[]] => {
     const half = Math.ceil(arr.length / 2);
     return [arr.slice(0, half), arr.slice(half)];
   };
 
-  // Load two pages of “Trending” and two pages of “Most‐Added”
+  // Fetch two pages of Trending and two pages of Most‐Added
   useEffect(() => {
     (async () => {
       try {
@@ -46,7 +46,7 @@ export function Step2PickShows() {
           getPopularShows(2),
         ]);
 
-        // Convert both pages → a single array of MediaItem (type: "tv")
+        // Convert each TVShow → MediaItem(type:"tv")
         const trendingItems: MediaItem[] = [
           ...t1.results.map((t) => ({
             id: t.id,
@@ -65,6 +65,7 @@ export function Step2PickShows() {
             type: "tv" as const,
           })),
         ];
+
         const mostAddedItems: MediaItem[] = [
           ...p1.results.map((t) => ({
             id: t.id,
@@ -93,7 +94,7 @@ export function Step2PickShows() {
     })();
   }, []);
 
-  // When the user “mouse up” on a poster, only toggle if they did NOT drag
+  // If user releases the mouse over a poster and they didn’t drag, toggle selection
   const onPosterMouseUp = (id: number) => {
     if (didDragRef.current) {
       didDragRef.current = false;
@@ -107,10 +108,14 @@ export function Step2PickShows() {
     });
   };
 
-  // “Next” / “Later” handlers
+  // “Next” and “Later” handlers
   const handleNext = async () => {
     if (!user) {
       setError("User not found. Please sign in again.");
+      return;
+    }
+    if (selectedShows.size === 0) {
+      // Won’t happen because button is disabled, but guard anyway
       return;
     }
     try {
@@ -124,6 +129,7 @@ export function Step2PickShows() {
       setError("Failed to save your selections. Try again.");
     }
   };
+
   const handleLater = async () => {
     if (!user) return;
     const userDocRef = doc(db, "users", user.uid);
@@ -131,10 +137,10 @@ export function Step2PickShows() {
     navigate("/onboarding/step3");
   };
 
-  // Generic hook: allows click‐and‐drag on a ref to scroll it horizontally
-  function useHorizontalDragScroll(ref: React.RefObject<HTMLDivElement | null>) {
+  // Generic “click‐and‐drag” horizontal scroll hook
+  function useHorizontalDragScroll(ref: React.RefObject<HTMLDivElement>) {
     useEffect(() => {
-      const element = ref.current!;
+      const element = ref.current;
       if (!element) return;
 
       let isDown = false;
@@ -143,7 +149,7 @@ export function Step2PickShows() {
 
       function onMouseDown(e: MouseEvent) {
         isDown = true;
-        didDragRef.current = false; // reset at the start of every press
+        didDragRef.current = false; // reset
         startX = e.pageX - element.offsetLeft;
         scrollLeft = element.scrollLeft;
         element.classList.add("dragging");
@@ -153,7 +159,6 @@ export function Step2PickShows() {
         element.classList.remove("dragging");
       }
       function onMouseUp(e: MouseEvent) {
-        // If the user moved more than 5px horizontally, count it as a drag
         if (isDown && Math.abs(e.pageX - (startX + element.offsetLeft)) > 5) {
           didDragRef.current = true;
         }
@@ -164,7 +169,7 @@ export function Step2PickShows() {
         if (!isDown) return;
         e.preventDefault();
         const x = e.pageX - element.offsetLeft;
-        const walk = (x - startX) * 1; // scroll speed factor = 1
+        const walk = (x - startX) * 1; // scroll speed = 1
         element.scrollLeft = scrollLeft - walk;
       }
 
@@ -192,14 +197,34 @@ export function Step2PickShows() {
 
   return (
     <div style={styles.container}>
+      {/* ─────────── TOP HEADER WITH “Next” & “Later” ─────────── */}
+      <div style={styles.topButtonsContainer}>
+        <button
+          onClick={handleLater}
+          style={styles.laterButton}
+        >
+          Later
+        </button>
+        <button
+          onClick={handleNext}
+          disabled={selectedShows.size === 0}
+          style={{
+            ...styles.nextButton,
+            opacity: selectedShows.size > 0 ? 1 : 0.5,
+            cursor: selectedShows.size > 0 ? "pointer" : "not-allowed",
+          }}
+        >
+          Next
+        </button>
+      </div>
+
+      {/* ─────────── INSTRUCTIONS & ERROR ─────────── */}
       <p style={styles.instructions}>
         Choose TV shows you’ve watched, are watching, or plan to watch.
       </p>
       {error && <p style={styles.error}>{error}</p>}
 
-      {/* ─────────────────────────────────────────────────────────────
-          TRENDING SHOWS – ROW 1
-      ───────────────────────────────────────────────────────────── */}
+      {/* ─────────── TRENDING SHOWS – ROW 1 ─────────── */}
       <h3 style={styles.categoryTitle}>Trending Shows</h3>
       <div
         ref={trendingRefs[0]}
@@ -221,9 +246,7 @@ export function Step2PickShows() {
         ))}
       </div>
 
-      {/* ─────────────────────────────────────────────────────────────
-          TRENDING SHOWS – ROW 2
-      ───────────────────────────────────────────────────────────── */}
+      {/* ─────────── TRENDING SHOWS – ROW 2 ─────────── */}
       <div
         ref={trendingRefs[1]}
         className="no-scrollbar"
@@ -244,10 +267,8 @@ export function Step2PickShows() {
         ))}
       </div>
 
-      {/* ─────────────────────────────────────────────────────────────
-          MOST‐ADDED SHOWS – ROW 1
-      ───────────────────────────────────────────────────────────── */}
-      <h3 style={styles.categoryTitle}>Most‐Added Shows</h3>
+      {/* ─────────── MOST-ADDED SHOWS – ROW 1 ─────────── */}
+      <h3 style={styles.categoryTitle}>Most-Added Shows</h3>
       <div
         ref={addedRefs[0]}
         className="no-scrollbar"
@@ -268,9 +289,7 @@ export function Step2PickShows() {
         ))}
       </div>
 
-      {/* ─────────────────────────────────────────────────────────────
-          MOST‐ADDED SHOWS – ROW 2
-      ───────────────────────────────────────────────────────────── */}
+      {/* ─────────── MOST-ADDED SHOWS – ROW 2 ─────────── */}
       <div
         ref={addedRefs[1]}
         className="no-scrollbar"
@@ -291,11 +310,23 @@ export function Step2PickShows() {
         ))}
       </div>
 
-      <div style={styles.buttonsContainer}>
-        <button onClick={handleLater} style={styles.laterButton}>
+      {/* ─────────── BOTTOM BUTTONS (OPTIONAL – can be removed) ─────────── */}
+      <div style={styles.bottomButtonsContainer}>
+        <button
+          onClick={handleLater}
+          style={styles.laterButton}
+        >
           Later
         </button>
-        <button onClick={handleNext} style={styles.nextButton}>
+        <button
+          onClick={handleNext}
+          disabled={selectedShows.size === 0}
+          style={{
+            ...styles.nextButton,
+            opacity: selectedShows.size > 0 ? 1 : 0.5,
+            cursor: selectedShows.size > 0 ? "pointer" : "not-allowed",
+          }}
+        >
           Next
         </button>
       </div>
@@ -308,9 +339,22 @@ const styles: { [key: string]: React.CSSProperties } = {
     padding: "1rem",
     color: "#fff",
   },
+  topButtonsContainer: {
+    display: "flex",
+    justifyContent: "center",
+    gap: "1rem",
+    marginBottom: "1rem",
+  },
+  bottomButtonsContainer: {
+    display: "flex",
+    justifyContent: "center",
+    gap: "1rem",
+    marginTop: "2rem",
+  },
   instructions: {
     fontSize: "1rem",
     marginBottom: "1rem",
+    textAlign: "center",
   },
   categoryTitle: {
     fontSize: "1.1rem",
@@ -322,7 +366,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     overflowX: "auto",
     paddingBottom: "1rem",
     cursor: "grab",
-    /* We rely on .no‐scrollbar class to hide the scrollbar itself. */
   },
   posterCell: {
     flex: "0 0 auto",
@@ -332,11 +375,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     backgroundPosition: "center",
     borderRadius: "4px",
     transition: "opacity 0.2s",
-  },
-  buttonsContainer: {
-    display: "flex",
-    justifyContent: "space-between",
-    marginTop: "2rem",
   },
   laterButton: {
     padding: "0.5rem 1rem",
@@ -357,5 +395,6 @@ const styles: { [key: string]: React.CSSProperties } = {
   error: {
     color: "salmon",
     marginBottom: "1rem",
+    textAlign: "center",
   },
 };
