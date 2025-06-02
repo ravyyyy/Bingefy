@@ -203,7 +203,7 @@ export function Step2PickShows() {
       <h3 style={styles.categoryTitle}>Trending Shows</h3>
       <div
         ref={trendingRefs[0]}
-        className="no‐scrollbar"
+        className="no-scrollbar"
         style={styles.horizontalRow}
       >
         {trendingRow1.map((show) => (
@@ -226,7 +226,7 @@ export function Step2PickShows() {
       ───────────────────────────────────────────────────────────── */}
       <div
         ref={trendingRefs[1]}
-        className="no‐scrollbar"
+        className="no-scrollbar"
         style={styles.horizontalRow}
       >
         {trendingRow2.map((show) => (
@@ -250,7 +250,7 @@ export function Step2PickShows() {
       <h3 style={styles.categoryTitle}>Most‐Added Shows</h3>
       <div
         ref={addedRefs[0]}
-        className="no‐scrollbar"
+        className="no-scrollbar"
         style={styles.horizontalRow}
       >
         {addedRow1.map((show) => (
@@ -273,7 +273,7 @@ export function Step2PickShows() {
       ───────────────────────────────────────────────────────────── */}
       <div
         ref={addedRefs[1]}
-        className="no‐scrollbar"
+        className="no-scrollbar"
         style={styles.horizontalRow}
       >
         {addedRow2.map((show) => (

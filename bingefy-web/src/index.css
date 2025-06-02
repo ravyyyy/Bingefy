@@ -13,26 +13,6 @@ body {
   overflow-x: hidden;
 }
 
-/* Custom scrollbar (for other scrollable areas, if any) */
-::-webkit-scrollbar {
-  width: 8px;
-}
-::-webkit-scrollbar-thumb {
-  background-color: #424242;
-  border-radius: 4px;
-}
-::-webkit-scrollbar-track {
-  background-color: #121212;
-}
-
-/* Hide scrollbar on any element with .no-scrollbar */
-.no-scrollbar {
-  scrollbar-width: none; /* Firefox */
-}
-.no-scrollbar::-webkit-scrollbar {
-  display: none; /* Safari/WebKit/Chrome */
-}
-
 /* Titles */
 h1,
 h2,
@@ -70,6 +50,21 @@ button {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
+   HIDE SCROLLBAR ON .no-scrollbar ONLY
+   (horizontal rows in onboarding steps)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* For Firefox */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+/* For WebKit (Chrome/Safari/Edge) */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
    Styles for the background‐animation rows (AuthLayout)
    ───────────────────────────────────────────────────────────────────────────── */
 
@@ -92,12 +87,12 @@ button {
   overflow: hidden;
 }
 
-/* Height for each row (e.g. 15vh to fit about 6–7 rows in full 100vh) */
+/* Height for each row (e.g. 15vh to fit 6–7 rows in full 100vh) */
 .row:nth-child(n) {
   height: 15vh;
 }
 
-/* Each poster: show the entire image (contain), maintain aspect ratio 2:3 */
+/* Each poster shows the entire image (contain), maintain 2:3 aspect ratio */
 .posterCell {
   height: 100%;
   width: calc((15vh) * (2 / 3)); /* 2:3 aspect ratio */
@@ -121,7 +116,7 @@ button {
   z-index: 1;
 }
 
-/* “Full Scroll” animation: translateX from 0 → -100% over 80s, looping infinitely */
+/* “Full Scroll” animation: translateX 0 → -100% over 80s, looping infinitely */
 @keyframes moveLeftFull {
   0% {
     transform: translateX(0);
