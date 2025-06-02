@@ -3,6 +3,7 @@
     "@types/node": "^22.15.29"
   },
   "dependencies": {
+    "firebase": "^11.8.1",
     "react-router-dom": "^6.30.1"
   }
 }
