@@ -64,6 +64,7 @@ export default function ShowsPage() {
 
   // Modal state: the episode clicked on (null = no modal open)
   const [modalEpisode, setModalEpisode] = useState<EpisodeInfo | null>(null);
+  const [animatingIds, setAnimatingIds] = useState<Set<string>>(new Set());
 
   const [error, setError] = useState<string | null>(null);
 
@@ -380,62 +381,141 @@ export default function ShowsPage() {
   // Helper: render the card for one episode in the scroll list
   // ─────────────────────────────────────────────────────────────
   const renderEpisodeCard = (epi: EpisodeInfo) => {
-    // Determine whether user has already watched this episode:
-    const watchedEntries = episodesWatchedMap[epi.showId] || [];
-    const isWatched = watchedEntries.some(
-      (we) => we.season === epi.season && we.episode === epi.episode
-    );
+  // Build a unique key for this episode:
+  const epiKey = `${epi.showId}-${epi.season}-${epi.episode}`;
 
-    return (
-      <div
-        key={`${epi.showId}-${epi.season}-${epi.episode}`}
-        style={styles.epiCard}
-        onClick={() => setModalEpisode(epi)} // open modal on card click
-      >
-        {epi.still_path ? (
-          <img
-            src={`${POSTER_BASE_URL}${epi.still_path}`}
-            alt={epi.showName}
-            style={styles.epiPoster}
-          />
-        ) : epi.poster_path ? (
-          <img
-            src={`${POSTER_BASE_URL}${epi.poster_path}`}
-            alt={epi.showName}
-            style={styles.epiPoster}
-          />
-        ) : (
-          <div style={styles.noImage}>No Image</div>
+  // Determine whether user has already watched this episode:
+  const watchedEntries = episodesWatchedMap[epi.showId] || [];
+  const isWatched = watchedEntries.some(
+    (we) => we.season === epi.season && we.episode === epi.episode
+  );
+
+  // Is this episode currently in “animating → turning green” state?
+  const isAnimating = animatingIds.has(epiKey);
+
+  return (
+    <div
+      key={epiKey}
+      style={styles.epiCard}
+      onClick={() => setModalEpisode(epi)} // open modal on card click
+    >
+      {epi.still_path ? (
+        <img
+          src={`${POSTER_BASE_URL}${epi.still_path}`}
+          alt={epi.showName}
+          style={styles.epiPoster}
+        />
+      ) : epi.poster_path ? (
+        <img
+          src={`${POSTER_BASE_URL}${epi.poster_path}`}
+          alt={epi.showName}
+          style={styles.epiPoster}
+        />
+      ) : (
+        <div style={styles.noImage}>No Image</div>
+      )}
+
+      <div style={styles.epiInfo}>
+        <span style={styles.showName}>{epi.showName}</span>
+        <span style={styles.epiLabel}>{epi.label}</span>
+        {epi.episodeTitle && (
+          <span style={styles.epiTitle}>{epi.episodeTitle}</span>
         )}
-
-        <div style={styles.epiInfo}>
-          <span style={styles.showName}>{epi.showName}</span>
-          <span style={styles.epiLabel}>{epi.label}</span>
-          {epi.episodeTitle && (
-            <span style={styles.epiTitle}>{epi.episodeTitle}</span>
-          )}
-          {epi.episodeOverview && (
-            <p style={styles.epiOverview}>
-              {epi.episodeOverview.length > 60
-                ? epi.episodeOverview.slice(0, 60) + "…"
-                : epi.episodeOverview}
-            </p>
-          )}
-        </div>
-
-        {/* Nice circular button to mark watched (always visible) */}
-        <button
-          style={isWatched ? styles.cardWatchedBadge : styles.cardWatchBtn}
-          onClick={(e) => {
-            e.stopPropagation(); // don’t open modal if button clicked
-            if (!isWatched) markAsWatched(epi);
-          }}
-        >
-          {isWatched ? "✔️" : "✓"}
-        </button>
+        {epi.episodeOverview && (
+          <p style={styles.epiOverview}>
+            {epi.episodeOverview.length > 60
+              ? epi.episodeOverview.slice(0, 60) + "…"
+              : epi.episodeOverview}
+          </p>
+        )}
       </div>
-    );
-  };
+
+      {/* Nice circular button to mark watched (white → animate to green) */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation(); // don’t open modal if button clicked
+
+          if (!isWatched && !isAnimating) {
+            // 1) Capture which sub‐array (“group”) this episode is in right now:
+            let groupForThis: EpisodeInfo[] = [];
+            if (activeTab === 0) {
+              if (
+                watchNextList.some(
+                  (x) =>
+                    x.showId === epi.showId &&
+                    x.season === epi.season &&
+                    x.episode === epi.episode
+                )
+              ) {
+                groupForThis = watchNextList;
+              } else if (
+                watchedAWhileList.some(
+                  (x) =>
+                    x.showId === epi.showId &&
+                    x.season === epi.season &&
+                    x.episode === epi.episode
+                )
+              ) {
+                groupForThis = watchedAWhileList;
+              } else {
+                groupForThis = notStartedList;
+              }
+            } else {
+              groupForThis = upcomingList;
+            }
+
+            // 2) Put this epiKey into “animating” set
+            setAnimatingIds((prev) => {
+              const copy = new Set(prev);
+              copy.add(epiKey);
+              return copy;
+            });
+
+            // 3) After a brief delay (400 ms), mark watched & advance
+            setTimeout(() => {
+              // a) Mark as watched in Firestore & local state
+              markAsWatched(epi);
+
+              // b) Remove from animating set
+              setAnimatingIds((prev) => {
+                const copy = new Set(prev);
+                copy.delete(epiKey);
+                return copy;
+              });
+
+              // c) Advance to next episode in the captured sub‐array
+              const idxInGroup = groupForThis.findIndex(
+                (x) =>
+                  x.showId === epi.showId &&
+                  x.season === epi.season &&
+                  x.episode === epi.episode
+              );
+              if (idxInGroup >= 0 && idxInGroup + 1 < groupForThis.length) {
+                setModalEpisode(groupForThis[idxInGroup + 1]);
+              } else {
+                setModalEpisode(null);
+              }
+            }, 400);
+          }
+        }}
+        style={{
+          // If already watched, show gray badge. Otherwise:
+          //   - if animating: green background + white check
+          //   - if not yet pressed: white circle + dark check
+          ...(isWatched
+            ? styles.cardWatchedBadge
+            : {
+                ...styles.cardWatchBtn,
+                backgroundColor: isAnimating ? "#28a745" : "#ffffff",
+                color: isAnimating ? "#ffffff" : "#000000",
+              }),
+        }}
+      >
+        {isWatched ? "✔️" : "✓"}
+      </button>
+    </div>
+  );
+};
 
   return (
     <div style={styles.container}>
@@ -725,15 +805,16 @@ const styles: { [key: string]: React.CSSProperties } = {
     position: "absolute",
     top: "8px",
     right: "8px",
-    backgroundColor: "#28a745",
+    backgroundColor: "#ffffff",
     border: "none",
     borderRadius: "50%",
     width: "28px",
     height: "28px",
-    color: "#fff",
+    color: "#000000",
     fontSize: "1rem",
     lineHeight: 1,
     cursor: "pointer",
+    transition: "background-color 0.3s ease",
   },
   cardWatchedBadge: {
     position: "absolute",
