@@ -518,7 +518,7 @@ export default function ShowsPage() {
   };
 
   return (
-    <div className="scrollable"  style={styles.container}>
+    <div className="scrollable"  style={{...styles.container, paddingBottom: "9rem"}}>
       {/* Tab Buttons */}
       <div style={styles.tabContainer}>
         <button
