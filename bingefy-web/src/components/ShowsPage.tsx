@@ -138,6 +138,7 @@ export default function ShowsPage() {
   // One list for the “Watched History” above Watch Next
   const [watchedHistory, setWatchedHistory] = useState<EpisodeInfo[]>([]);
   const [historyCount, setHistoryCount] = useState(5);
+  const [showHistory, setShowHistory] = useState(false);
 
   // One list for the “Upcoming” tab
   const [upcomingList, setUpcomingList] = useState<EpisodeInfo[]>([]);
@@ -645,8 +646,11 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
       onScroll={(e) => {
         const target = e.target as HTMLElement;
         // When user scrolls within 50px of top, load 5 more history items:
-        if (target.scrollTop < 50 && historyCount < watchedHistory.length) {
-          setHistoryCount((prev) => prev + 5);
+        if (target.scrollTop < 50) {
+          setShowHistory(true);
+          if (historyCount < watchedHistory.length) {
+            setHistoryCount((prev) => prev + 5);
+          }
         }
       }}
     >
@@ -676,7 +680,7 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
       {error && <p style={styles.error}>{error}</p>}
 
       {/* ─────────── “Watched History” Section (new) ─────────── */}
-      {activeTab === 0 && watchedHistory.length > 0 && (
+      {activeTab === 0 && showHistory && watchedHistory.length > 0 && (
         <div style={{ marginBottom: "1.5rem" }}>
           <div style={styles.sectionHeader}>Watched History</div>
           {watchedHistory.slice(0, historyCount).map((epi) =>
