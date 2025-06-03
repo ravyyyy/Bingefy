@@ -1074,10 +1074,15 @@ const styles: { [key: string]: React.CSSProperties } = {
     marginBottom: "2rem",
   },
   sectionHeader: {
+    position: "sticky",
+    top: 0,
+    backgroundColor: "#181818",
+    zIndex: 10,
     fontSize: "0.85rem",
     fontWeight: "bold",
     color: "#888",
     marginBottom: "0.5rem",
+    padding: "0.5rem 0",
   },
   epiCard: {
     display: "flex",
