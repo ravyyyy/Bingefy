@@ -730,7 +730,9 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
     ref={historyContainerRef}
     style={{ marginBottom: "1.5rem" }}
   >
-    <div style={styles.sectionHeader}>Watched History</div>
+    <div style={styles.sectionBadge}>
+            <span style={styles.sectionBadgeText}>WATCH HISTORY</span>
+          </div>
     {[...watchedHistory.slice(0, historyCount)]
   .reverse()
   .map((epi) => renderHistoryCard(epi))}
@@ -741,7 +743,9 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
       {/* ─────────── “Watch Next” Section ─────────── */}
       {activeTab === 0 && watchNextList.length > 0 && (
         <div style={styles.section}>
-          <div style={styles.sectionHeader}>WATCH NEXT</div>
+          <div style={styles.sectionBadge}>
+            <span style={styles.sectionBadgeText}>WATCH NEXT</span>
+          </div>
           {watchNextList.map((epi) => renderEpisodeCard(epi))}
         </div>
       )}
@@ -749,7 +753,9 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
       {/* ─────────── “Haven’t Watched For A While” Section ─────────── */}
       {activeTab === 0 && watchedAWhileList.length > 0 && (
         <div style={styles.section}>
-          <div style={styles.sectionHeader}>HAVEN’T WATCHED FOR A WHILE</div>
+          <div style={styles.sectionBadge}>
+            <span style={styles.sectionBadgeText}>HAVEN’T WATCHED FOR A WHILE</span>
+          </div>
           {watchedAWhileList.map((epi) => renderEpisodeCard(epi))}
         </div>
       )}
@@ -757,7 +763,9 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
       {/* ─────────── “Haven’t Started” Section ─────────── */}
       {activeTab === 0 && notStartedList.length > 0 && (
         <div style={styles.section}>
-          <div style={styles.sectionHeader}>HAVEN’T STARTED</div>
+          <div style={styles.sectionBadge}>
+            <span style={styles.sectionBadgeText}>HAVEN’T STARTED</span>
+          </div>
           {notStartedList.map((epi) => renderEpisodeCard(epi))}
         </div>
       )}
@@ -1073,16 +1081,27 @@ const styles: { [key: string]: React.CSSProperties } = {
   section: {
     marginBottom: "2rem",
   },
-  sectionHeader: {
+  // New “badge” wrapper — positions the badge in the center and makes it sticky if you like:
+  sectionBadge: {
     position: "sticky",
-    top: 0,
-    backgroundColor: "#181818",
+    top: 0,                          // sticks the badge to the top of the scroll container
+    display: "flex",
+    justifyContent: "center",
+    backgroundColor: "transparent",  // let the badge’s <span> handle its own background
     zIndex: 10,
-    fontSize: "0.85rem",
+    margin: "1rem 0 0.5rem 0",       // space above/below each badge
+    padding: 0,
+  },
+
+  // The pill-shaped background (dark gray) with white text, centered:
+  sectionBadgeText: {
+    backgroundColor: "#2a2a2a",  // dark gray
+    color: "#fff",
+    fontSize: "0.75rem",
     fontWeight: "bold",
-    color: "#888",
-    marginBottom: "0.5rem",
-    padding: "0.5rem 0",
+    padding: "4px 12px",        
+    borderRadius: "999px",       // fully rounded pill shape
+    whiteSpace: "nowrap",        // prevent wrapping
   },
   epiCard: {
     display: "flex",
