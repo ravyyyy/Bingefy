@@ -5,7 +5,7 @@ import { NavLink, Outlet } from "react-router-dom";
 export function TabsLayout() {
   return (
     <div style={styles.outerContainer}>
-      {/* 1) Top tab bar */}
+      {/* 1) Main menu: now pinned to bottom */}
       <nav style={styles.tabBar}>
         <NavLink
           to="shows"
@@ -40,7 +40,7 @@ export function TabsLayout() {
         </NavLink>
       </nav>
 
-      {/* 2) Content area for whichever tab is active */}
+      {/* 2) Content area: scrollable, with bottom padding to avoid being hidden */}
       <div style={styles.contentContainer}>
         <Outlet />
       </div>
@@ -52,16 +52,20 @@ const styles: { [key: string]: React.CSSProperties } = {
   outerContainer: {
     display: "flex",
     flexDirection: "column",
-    height: "100vh",
+    minHeight: "100vh", // ensure the container fills full viewport
     backgroundColor: "#000",
   },
   tabBar: {
+    position: "fixed",
+    bottom: 0,
+    left: 0,
+    width: "100%",
     display: "flex",
     justifyContent: "space-around",
     alignItems: "center",
-    height: "64px",               // increased from 56px
+    height: "64px",           // same height as before
     backgroundColor: "#111",
-    borderBottom: "1px solid #333",
+    borderTop: "1px solid #333", // separator above the bar
     zIndex: 10,
   },
   tab: {
@@ -71,9 +75,9 @@ const styles: { [key: string]: React.CSSProperties } = {
     justifyContent: "center",
     color: "#888",
     textDecoration: "none",
-    fontSize: "14px",             // increased from 12px
-    gap: "4px",                   // a bit more space between icon & label
-    width: "25%",                 // each of four tabs is 25% wide
+    fontSize: "14px",
+    gap: "4px",
+    width: "25%",
     height: "100%",
     transition: "color 0.2s",
   },
@@ -88,19 +92,20 @@ const styles: { [key: string]: React.CSSProperties } = {
     gap: "4px",
     width: "25%",
     height: "100%",
-    borderBottom: "3px solid #e50914", // thicker active indicator
+    borderBottom: "3px solid #e50914",
     transition: "color 0.2s, border-bottom 0.2s",
   },
   icon: {
-    fontSize: "28px",             // increased from 20px
+    fontSize: "28px",
     lineHeight: 1,
   },
   label: {
-    fontSize: "14px",             // matches the “fontSize” in tab/activeTab
+    fontSize: "14px",
     fontWeight: 500,
   },
   contentContainer: {
     flex: 1,
     overflow: "hidden",
+    paddingBottom: "64px", // leave room at bottom for the fixed tabBar
   },
 };
