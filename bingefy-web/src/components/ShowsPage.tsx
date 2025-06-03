@@ -701,25 +701,27 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
 >
       {/* Tab Buttons */}
       <div style={styles.tabContainer}>
-        <button
-          onClick={() => setActiveTab(0)}
-          style={{
-            ...styles.tabButton,
-            borderBottom: activeTab === 0 ? "3px solid #e50914" : "none",
-          }}
-        >
-          Watch List
-        </button>
-        <button
-          onClick={() => setActiveTab(1)}
-          style={{
-            ...styles.tabButton,
-            borderBottom: activeTab === 1 ? "3px solid #e50914" : "none",
-          }}
-        >
-          Upcoming
-        </button>
-      </div>
+  <button
+    onClick={() => setActiveTab(0)}
+    style={{
+      ...styles.tabButton,
+      ...(activeTab === 0 ? styles.tabButtonActive : {}),
+    }}
+  >
+    Watch List
+  </button>
+  <button
+    onClick={() => setActiveTab(1)}
+    style={{
+      ...styles.tabButton,
+      ...(activeTab === 1 ? styles.tabButtonActive : {}),
+    }}
+  >
+    Upcoming
+  </button>
+</div>
+
+
 
       {/* Error Banner */}
       {error && <p style={styles.error}>{error}</p>}
@@ -1060,19 +1062,30 @@ const styles: { [key: string]: React.CSSProperties } = {
     /* Note: we no longer need overflow here, because scrolling is driven by .scrollable */
   },
   tabContainer: {
-    display: "flex",
-    justifyContent: "center",
-    gap: "1rem",
-    marginBottom: "1rem",
-  },
-  tabButton: {
-    background: "none",
-    border: "none",
-    color: "#fff",
-    fontSize: "1rem",
-    padding: "0.5rem 1rem",
-    cursor: "pointer",
-  },
+  position: "sticky",
+  top: 0,
+  display: "flex",
+  justifyContent: "center",
+  gap: "1rem",
+  padding: "0.75rem 0",            // shrink or adjust as needed
+  backgroundColor: "#121212",     // make it pure black (“#000”) or match your main nav
+  zIndex: 20,
+},
+tabButton: {
+  background: "none",
+  border: "none",
+  color: "#fff",
+  fontSize: "1rem",
+  fontWeight: "bold",
+  textTransform: "uppercase",
+  padding: "0.5rem 1rem",        // match your other menu’s padding
+  cursor: "pointer",
+  transition: "color 0.2s ease",
+},
+tabButtonActive: {
+  color: "#e50914",              // red text for the active tab
+},
+
   error: {
     color: "#ff4d4f",
     textAlign: "center",
