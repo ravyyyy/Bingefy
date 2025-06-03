@@ -622,7 +622,7 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
       key={epiKey}
       style={{
         ...styles.epiCard,
-        backgroundColor: "#2a2a2a", // lighter gray
+        backgroundColor: "#2a2a2a",
       }}
       onClick={() => setModalEpisode(epi)}
     >
@@ -650,19 +650,21 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
         )}
       </div>
 
-      {/* Always‐watched: show the same badge style used by renderEpisodeCard */}
+      {/* green “✓” that lets you unwatch */}
       <button
         onClick={(e) => {
-          // We do nothing on click (it’s already watched),
-          // but you can keep this here in case you ever want
-          // a “click to unwatch” behavior later.
           e.stopPropagation();
+          const confirmUnwatch = window.confirm(
+            "This episode is already marked as watched. Do you want to unwatch it?"
+          );
+          if (confirmUnwatch) {
+            unmarkAsWatched(epi);
+          }
         }}
         style={{
-          // In `renderEpisodeCard`, whenever “isWatched” is true, we apply styles.cardWatchedBadge
-          ...styles.cardWatchBtn,
-          backgroundColor: "#28a745", // slightly lighter gray, same as EpisodeCard
-          color: "#fff"
+          ...styles.cardWatchBtn,      // same base as “mark as watched”
+          backgroundColor: "#28a745",  // green
+          color: "#fff",               // white checkmark
         }}
       >
         ✓
