@@ -490,45 +490,8 @@ export default function ShowsPage() {
                   return copy;
                 });
 
-                // c) Attempt to advance to next episode via TMDB lookups:
-                const showId = epi.showId;
-                let nextSeason = epi.season;
-                let nextEpisode = epi.episode + 1;
-                let nextDetails: EpisodeDetail | null = null;
-
-                // Try same season, next episode first:
-                try {
-                  nextDetails = await getEpisodeDetails(
-                    showId,
-                    nextSeason,
-                    nextEpisode
-                  );
-                } catch {
-                  nextDetails = null;
-                }
-
-                if (nextDetails) {
-                  // We found a valid “next” episode in the SAME season.
-                  const showDet = await getTVShowDetails(showId);
-                  const nextLabel = `S${nextSeason} E${nextEpisode}`;
-                  const newEpisodeInfo: EpisodeInfo = {
-                    showId,
-                    showName: showDet.name,
-                    poster_path: showDet.poster_path,
-                    season: nextSeason,
-                    episode: nextEpisode,
-                    label: nextLabel,
-                    episodeTitle: nextDetails.name,
-                    episodeOverview: nextDetails.overview,
-                    air_date: nextDetails.air_date,
-                    still_path: nextDetails.still_path,
-                  };
-                  // Open the modal for that same‐season next episode
-                  setModalEpisode(newEpisodeInfo);
-                } else {
-                  // We do NOT auto‐open “next season.” Just close modal.
-                  setModalEpisode(null);
-                }
+                // c) JUST CLOSE THE MODAL (no auto-advance)
++                setModalEpisode(null);
               }, 400); // 400ms for the white→green transition
             }
           }}
