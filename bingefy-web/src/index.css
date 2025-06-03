@@ -13,6 +13,17 @@ body {
   overflow-x: hidden;
 }
 
+html, body {
+  overflow-y: scroll;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
+}
+
 /* Titles */
 h1,
 h2,
