@@ -140,6 +140,10 @@ export default function ShowsPage() {
   const [historyCount, setHistoryCount] = useState(5);
   const [showHistory, setShowHistory] = useState(false);
   const lastScrollTop = useRef(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const historyContainerRef = useRef<HTMLDivElement>(null);
+  const [historyInitialized, setHistoryInitialized] = useState(false);
+
 
   // One list for the “Upcoming” tab
   const [upcomingList, setUpcomingList] = useState<EpisodeInfo[]>([]);
@@ -445,6 +449,23 @@ useEffect(() => {
   buildHistory();
 }, [episodesWatchedMap]);
 
+// ─────────────────────────────────────────────────────────────
+// 5) Once the watchedHistory array is populated, scroll down
+//    by its container’s height so “Watch Next” sits at top.
+// ─────────────────────────────────────────────────────────────
+useEffect(() => {
+  if (
+    !historyInitialized &&
+    historyContainerRef.current !== null &&
+    scrollRef.current !== null
+  ) {
+    // push scroll down by the height of the history container
+    scrollRef.current.scrollTop = historyContainerRef.current.offsetHeight;
+    setHistoryInitialized(true);
+  }
+}, [watchedHistory, historyInitialized]);
+
+
   /**
    * When user clicks “✔️” to mark this episode as watched:
    *   1) Append a new WatchedEntry to Firestore: episodesWatched.<showId>
@@ -642,27 +663,20 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
 
   return (
     <div
+    ref={scrollRef}
   className="scrollable"
   style={{ ...styles.container, paddingBottom: "9rem" }}
   onScroll={(e) => {
     const target = e.target as HTMLElement;
     const curr = target.scrollTop;
 
-    // 1) if we’re scrolling up into the top‐50px for the first time, reveal history
-    if (curr < 50 && lastScrollTop.current > curr && !showHistory) {
-      setShowHistory(true);
+    // when they scroll up into the top 50px (and we haven’t already bumped historyCount),
+    // load 5 more:
+    if (curr < 50 && lastScrollTop.current > curr) {
+      if (historyCount < watchedHistory.length) {
+        setHistoryCount((prev) => prev + 5);
+      }
     }
-
-    // 2) once showHistory is true, only load 5 more when we cross from >50px down to <50px
-    if (
-      showHistory &&
-      lastScrollTop.current > 50 &&
-      curr < 50 &&
-      historyCount < watchedHistory.length
-    ) {
-      setHistoryCount((prev) => prev + 5);
-    }
-
     lastScrollTop.current = curr;
   }}
 >
@@ -692,14 +706,18 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
       {error && <p style={styles.error}>{error}</p>}
 
       {/* ─────────── “Watched History” Section (new) ─────────── */}
-      {activeTab === 0 && showHistory && watchedHistory.length > 0 && (
-        <div style={{ marginBottom: "1.5rem" }}>
-          <div style={styles.sectionHeader}>Watched History</div>
-          {watchedHistory.slice(0, historyCount).map((epi) =>
-            renderHistoryCard(epi)
-          )}
-        </div>
-      )}
+      {activeTab === 0 && watchedHistory.length > 0 && (
+  <div
+    ref={historyContainerRef}
+    style={{ marginBottom: "1.5rem" }}
+  >
+    <div style={styles.sectionHeader}>Watched History</div>
+    {watchedHistory.slice(0, historyCount).map((epi) =>
+      renderHistoryCard(epi)
+    )}
+  </div>
+)}
+
 
       {/* ─────────── “Watch Next” Section ─────────── */}
       {activeTab === 0 && watchNextList.length > 0 && (
