@@ -62,7 +62,7 @@ async function fetchSiblingEpisode(
   try {
     return await getEpisodeDetails(showId, targetSeason, targetEpisode);
   } catch {
-    // TMDB returned 404; no same-season sibling
+    // TMDB returned 404; no same‐season sibling
     return null;
   }
 }
@@ -208,19 +208,19 @@ export default function ShowsPage() {
           })
         );
 
-        // 2b) Build THREE “finalized” lists, including only episodes that TMDB confirms exist
+        // 2b) Build THREE “finalized” lists, but only include episodes that TMDB confirms exist
         const finalizedNext: EpisodeInfo[] = [];
         const finalizedAWhile: EpisodeInfo[] = [];
         const finalizedNotStarted: EpisodeInfo[] = [];
 
-        // Helper: attempt to fetch one episode (possibly next season if same-season fails)
+        // Helper function to attempt to fetch an episode; returns EpisodeInfo or null if 404
         const tryBuildEpisode = async (
           showId: number,
           season: number,
           episode: number,
           label: string
         ): Promise<EpisodeInfo | null> => {
-          // 1) Try (season, episode)
+          // 1) First attempt: (season, episode)
           try {
             const epDet = await getEpisodeDetails(showId, season, episode);
             const showDet = detailsMap[showId];
@@ -238,7 +238,7 @@ export default function ShowsPage() {
               vote_average: epDet.vote_average || 0,
             };
           } catch {
-            // 2) If that fails, try (season+1, 1)
+            // 2) If that fails, attempt (season+1, episode=1)
             const nextSeason = season + 1;
             try {
               const epDet2 = await getEpisodeDetails(showId, nextSeason, 1);
@@ -257,13 +257,13 @@ export default function ShowsPage() {
                 vote_average: epDet2.vote_average || 0,
               };
             } catch {
-              // 3) No next episode → null
+              // 3) If that also fails, there is no “next” episode—return null
               return null;
             }
           }
         };
 
-        // Build each group in parallel
+        // Concurrently build all three lists:
         await Promise.all(
           nextArr.map(async (cand) => {
             const epiInfo = await tryBuildEpisode(
@@ -591,11 +591,43 @@ export default function ShowsPage() {
           style={styles.modalOverlay}
           onClick={() => setModalEpisode(null)}
         >
+          {/* Left‐side arrow now lives as a sibling of modalContent */}
+          <button
+            style={styles.modalArrowLeft}
+            onClick={async (e) => {
+              e.stopPropagation();
+              const prevEp = await fetchSiblingEpisode(
+                modalEpisode.showId,
+                modalEpisode.season,
+                modalEpisode.episode,
+                "prev"
+              );
+              if (prevEp) {
+                const showDet = await getTVShowDetails(modalEpisode.showId);
+                setModalEpisode({
+                  showId: modalEpisode.showId,
+                  showName: showDet.name,
+                  poster_path: showDet.poster_path,
+                  season: prevEp.season_number,
+                  episode: prevEp.episode_number,
+                  label: `S${prevEp.season_number} E${prevEp.episode_number}`,
+                  episodeTitle: prevEp.name,
+                  episodeOverview: prevEp.overview,
+                  air_date: prevEp.air_date,
+                  still_path: prevEp.still_path,
+                  vote_average: prevEp.vote_average || 0,
+                });
+              }
+            }}
+          >
+            ◀
+          </button>
+
           <div
             style={styles.modalContent}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* ─────────── Top‐Left “Back to Show” Button ─────────── */}
+            {/* ─────────── Top-Left “Back to Show” Button ─────────── */}
             <button
               style={styles.modalBackButton}
               onClick={() => {
@@ -629,77 +661,13 @@ export default function ShowsPage() {
                   </span>
                 )}
               </div>
-
-              {/* ◀ Previous Episode Arrow */}
-              <button
-                style={styles.modalArrowLeft}
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  const prevEp = await fetchSiblingEpisode(
-                    modalEpisode.showId,
-                    modalEpisode.season,
-                    modalEpisode.episode,
-                    "prev"
-                  );
-                  if (prevEp) {
-                    const showDet = await getTVShowDetails(modalEpisode.showId);
-                    setModalEpisode({
-                      showId: modalEpisode.showId,
-                      showName: showDet.name,
-                      poster_path: showDet.poster_path,
-                      season: prevEp.season_number,
-                      episode: prevEp.episode_number,
-                      label: `S${prevEp.season_number} E${prevEp.episode_number}`,
-                      episodeTitle: prevEp.name,
-                      episodeOverview: prevEp.overview,
-                      air_date: prevEp.air_date,
-                      still_path: prevEp.still_path,
-                      vote_average: prevEp.vote_average || 0,
-                    });
-                  }
-                }}
-              >
-                ◀
-              </button>
-
-              {/* ▶ Next Episode Arrow */}
-              <button
-                style={styles.modalArrowRight}
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  const nextEp = await fetchSiblingEpisode(
-                    modalEpisode.showId,
-                    modalEpisode.season,
-                    modalEpisode.episode,
-                    "next"
-                  );
-                  if (nextEp) {
-                    const showDet = await getTVShowDetails(modalEpisode.showId);
-                    setModalEpisode({
-                      showId: modalEpisode.showId,
-                      showName: showDet.name,
-                      poster_path: showDet.poster_path,
-                      season: nextEp.season_number,
-                      episode: nextEp.episode_number,
-                      label: `S${nextEp.season_number} E${nextEp.episode_number}`,
-                      episodeTitle: nextEp.name,
-                      episodeOverview: nextEp.overview,
-                      air_date: nextEp.air_date,
-                      still_path: nextEp.still_path,
-                      vote_average: nextEp.vote_average || 0,
-                    });
-                  }
-                }}
-              >
-                ▶
-              </button>
             </div>
 
             {/* ─────────── “Where to Watch” Placeholder Section ─────────── */}
             <div style={styles.modalWhereToWatchSection}>
               <h3 style={styles.modalWhereToWatchHeader}>Where to watch</h3>
               <button style={styles.modalNetflixButton}>NETFLIX</button>
-              {/* (Add other streaming buttons here as needed) */}
+              {/* (You can add other streaming buttons here.) */}
             </div>
 
             {/* ─────────── Episode Info Section ─────────── */}
@@ -764,6 +732,38 @@ export default function ShowsPage() {
               })()}
             </div>
           </div>
+
+          {/* Right‐side arrow now lives as a sibling of modalContent */}
+          <button
+            style={styles.modalArrowRight}
+            onClick={async (e) => {
+              e.stopPropagation();
+              const nextEp = await fetchSiblingEpisode(
+                modalEpisode.showId,
+                modalEpisode.season,
+                modalEpisode.episode,
+                "next"
+              );
+              if (nextEp) {
+                const showDet = await getTVShowDetails(modalEpisode.showId);
+                setModalEpisode({
+                  showId: modalEpisode.showId,
+                  showName: showDet.name,
+                  poster_path: showDet.poster_path,
+                  season: nextEp.season_number,
+                  episode: nextEp.episode_number,
+                  label: `S${nextEp.season_number} E${nextEp.episode_number}`,
+                  episodeTitle: nextEp.name,
+                  episodeOverview: nextEp.overview,
+                  air_date: nextEp.air_date,
+                  still_path: nextEp.still_path,
+                  vote_average: nextEp.vote_average || 0,
+                });
+              }
+            }}
+          >
+            ▶
+          </button>
         </div>
       )}
     </div>
@@ -927,7 +927,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 
   // ────────────────────────────────────────────────────────────────────────────
-  // Back-to-Show Button (top-left)
+  // Back-to -Show Button (top-left)
   // ────────────────────────────────────────────────────────────────────────────
   modalBackButton: {
     position: "absolute",
@@ -988,7 +988,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 
   // ────────────────────────────────────────────────────────────────────────────
-  // “Where to Watch” placeholder section inside modal
+  // “Where to Watch” placeholder section inside modal
   // ────────────────────────────────────────────────────────────────────────────
   modalWhereToWatchSection: {
     padding: "1rem",
@@ -1082,42 +1082,42 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 
   // ────────────────────────────────────────────────────────────────────────────
-  // New: “Previous” Arrow (left) on top of the still image
+  // Updated: “Previous” Arrow (left) just outside the image wrapper
   // ────────────────────────────────────────────────────────────────────────────
   modalArrowLeft: {
     position: "absolute",
-    top: "50%",
-    left: "12px",
-    transform: "translateY(-50%)",
-    backgroundColor: "rgba(0,0,0,0.5)",
+    top: "calc(50% - 10px)",  // make it vertically center on the still‐image area
+    left: "25%",              // arrow sits to left side of centered modalContent
+    transform: "translateX(-100%) translateY(-50%)",
+    backgroundColor: "rgba(255,255,255,0.8)",
     border: "none",
-    color: "#fff",
+    color: "#000",
     fontSize: "1.5rem",
     lineHeight: 1,
-    width: "32px",
-    height: "32px",
+    width: "40px",
+    height: "40px",
     borderRadius: "50%",
     cursor: "pointer",
-    zIndex: 2,
+    zIndex: 3,
   },
 
   // ────────────────────────────────────────────────────────────────────────────
-  // New: “Next” Arrow (right) on top of the still image
+  // Updated: “Next” Arrow (right) just outside the image wrapper
   // ────────────────────────────────────────────────────────────────────────────
   modalArrowRight: {
     position: "absolute",
-    top: "50%",
-    right: "12px",
-    transform: "translateY(-50%)",
-    backgroundColor: "rgba(0,0,0,0.5)",
+    top: "calc(50% - 10px)",  // vertically center on the still‐image area
+    right: "25%",
+    transform: "translateX(100%) translateY(-50%)",
+    backgroundColor: "rgba(255,255,255,0.8)",
     border: "none",
-    color: "#fff",
+    color: "#000",
     fontSize: "1.5rem",
     lineHeight: 1,
-    width: "32px",
-    height: "32px",
+    width: "40px",
+    height: "40px",
     borderRadius: "50%",
     cursor: "pointer",
-    zIndex: 2,
+    zIndex: 3,
   },
 };
