@@ -42,28 +42,62 @@ interface EpisodeInfo {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helper: Attempt to fetch a sibling episode (same season).
-// Returns EpisodeDetail or null if TMDB returns 404 or episode < 1.
+// Helper: remove any duplicate (season,episode) pairs and keep only
+//         the one with the greatest watchedAt timestamp.
+// ─────────────────────────────────────────────────────────────────────────────
+function dedupeWatchedEntries(entries: WatchedEntry[]): WatchedEntry[] {
+  const map: Record<string, WatchedEntry> = {};
+  for (const e of entries) {
+    const key = `${e.season}|${e.episode}`;
+    if (!map[key] || new Date(e.watchedAt) > new Date(map[key].watchedAt)) {
+      map[key] = e;
+    }
+  }
+  return Object.values(map);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper: given a showId, current (season, episode) and a direction ("prev" or "next"),
+//           attempt to fetch that sibling episode via TMDB. Returns EpisodeDetail or null.
 // ─────────────────────────────────────────────────────────────────────────────
 async function fetchSiblingEpisode(
   showId: number,
-  season: number,
-  episode: number,
+  currentSeason: number,
+  currentEpisode: number,
   direction: "prev" | "next"
 ): Promise<EpisodeDetail | null> {
-  let targetSeason = season;
-  let targetEpisode = direction === "next" ? episode + 1 : episode - 1;
-
-  // If “prev” and episode goes below 1, bail out:
-  if (direction === "prev" && targetEpisode < 1) {
+  if (direction === "prev") {
+    // 1) If there is a previous episode in the same season:
+    if (currentEpisode > 1) {
+      try {
+        return await getEpisodeDetails(showId, currentSeason, currentEpisode - 1);
+      } catch {
+        return null;
+      }
+    }
+    // 2) If we're at episode 1 of season > 1, go back to season-1, episode 1
+    if (currentSeason > 1) {
+      try {
+        return await getEpisodeDetails(showId, currentSeason - 1, 1);
+      } catch {
+        return null;
+      }
+    }
+    // 3) Otherwise, no previous
     return null;
-  }
-
-  try {
-    return await getEpisodeDetails(showId, targetSeason, targetEpisode);
-  } catch {
-    // TMDB returned 404; no same-season sibling
-    return null;
+  } else {
+    // direction === "next"
+    // 1) Try same season, next episode
+    try {
+      return await getEpisodeDetails(showId, currentSeason, currentEpisode + 1);
+    } catch {
+      // 2) If that 404’s, try next season episode 1
+      try {
+        return await getEpisodeDetails(showId, currentSeason + 1, 1);
+      } catch {
+        return null;
+      }
+    }
   }
 }
 
@@ -158,25 +192,25 @@ export default function ShowsPage() {
         const notStartedArr: Candidate[] = [];
 
         for (const showId of onboardedIds) {
-          const watchedEntries = episodesWatchedMap[showId] || [];
+          // ─────────── De‐duplicate (season,episode) pairs ───────────
+          const rawEntries = episodesWatchedMap[showId] || [];
+          const uniqueEntries = dedupeWatchedEntries(rawEntries);
 
-          if (watchedEntries.length === 0) {
+          if (uniqueEntries.length === 0) {
             // Never watched → “Haven’t Started”: Season 1 Episode 1
             notStartedArr.push({ showId, season: 1, episode: 1, label: "S1 E1" });
             continue;
           }
 
-          // Sort watched entries by watchedAt descending
-          watchedEntries.sort(
-            (a, b) =>
-              new Date(b.watchedAt).getTime() - new Date(a.watchedAt).getTime()
+          // Sort the de-duplicated list by watchedAt descending
+          uniqueEntries.sort(
+            (a, b) => new Date(b.watchedAt).getTime() - new Date(a.watchedAt).getTime()
           );
-          const mostRecent = watchedEntries[0];
-          const lastWatchedDate = mostRecent.watchedAt;
-          const lastSeason = mostRecent.season;
+          const mostRecent = uniqueEntries[0];
+          const lastSeason  = mostRecent.season;
           const lastEpisode = mostRecent.episode;
 
-          if (lastWatchedDate > thirtyDaysAgo) {
+          if (mostRecent.watchedAt > thirtyDaysAgo) {
             // Watched in last 30 days → “Watch Next”
             nextArr.push({
               showId,
@@ -195,7 +229,7 @@ export default function ShowsPage() {
           }
         }
 
-        // 2a) Pre-load show details for all candidate showIds
+        // ─────────── (2a) Pre‐load show details for every candidate showId ───────────
         const allCandidates = [...nextArr, ...aWhileArr, ...notStartedArr];
         const uniqueShowIds = Array.from(
           new Set(allCandidates.map((e) => e.showId))
@@ -208,19 +242,19 @@ export default function ShowsPage() {
           })
         );
 
-        // 2b) Build THREE “finalized” lists, but only include episodes that TMDB confirms exist
+        // ─────────── (2b) Build “finalized” lists, but only if TMDB confirms the episode exists ───────────
         const finalizedNext: EpisodeInfo[] = [];
         const finalizedAWhile: EpisodeInfo[] = [];
         const finalizedNotStarted: EpisodeInfo[] = [];
 
-        // Helper function to attempt to fetch an episode; returns EpisodeInfo or null if 404
+        // Helper: fetch an episode to see if it exists (returns EpisodeInfo or null)
         const tryBuildEpisode = async (
           showId: number,
           season: number,
           episode: number,
           label: string
         ): Promise<EpisodeInfo | null> => {
-          // 1) First attempt: (season, episode)
+          // 1) Try (season, episode)
           try {
             const epDet = await getEpisodeDetails(showId, season, episode);
             const showDet = detailsMap[showId];
@@ -238,7 +272,7 @@ export default function ShowsPage() {
               vote_average: epDet.vote_average || 0,
             };
           } catch {
-            // 2) If that fails, attempt (season+1, episode=1)
+            // 2) If that 404’d, try (season+1, 1)
             const nextSeason = season + 1;
             try {
               const epDet2 = await getEpisodeDetails(showId, nextSeason, 1);
@@ -257,13 +291,13 @@ export default function ShowsPage() {
                 vote_average: epDet2.vote_average || 0,
               };
             } catch {
-              // 3) If that also fails, there is no “next” episode—return null
+              // 3) If that also 404’d, there truly is no “next” → return null.
               return null;
             }
           }
         };
 
-        // Concurrently build all three lists:
+        // Build finalizedNext
         await Promise.all(
           nextArr.map(async (cand) => {
             const epiInfo = await tryBuildEpisode(
@@ -275,6 +309,7 @@ export default function ShowsPage() {
             if (epiInfo) finalizedNext.push(epiInfo);
           })
         );
+        // Build finalizedAWhile
         await Promise.all(
           aWhileArr.map(async (cand) => {
             const epiInfo = await tryBuildEpisode(
@@ -286,6 +321,7 @@ export default function ShowsPage() {
             if (epiInfo) finalizedAWhile.push(epiInfo);
           })
         );
+        // Build finalizedNotStarted
         await Promise.all(
           notStartedArr.map(async (cand) => {
             const epiInfo = await tryBuildEpisode(
@@ -298,6 +334,7 @@ export default function ShowsPage() {
           })
         );
 
+        // Finally push into state
         setWatchNextList(finalizedNext);
         setWatchedAWhileList(finalizedAWhile);
         setNotStartedList(finalizedNotStarted);
@@ -379,7 +416,7 @@ export default function ShowsPage() {
 
   /**
    * When user clicks “✔️” to mark this episode as watched:
-   *   1) Append a new WatchedEntry to Firestore: episodesWatched.<showId>
+   *   1) Append a new WatchedEntry to Firestore → episodesWatched.<showId>
    *   2) Update local state so UI re‐renders immediately
    */
   const markAsWatched = async (epi: EpisodeInfo) => {
@@ -387,7 +424,7 @@ export default function ShowsPage() {
     const nowISO = new Date().toISOString();
     const userRef = doc(db, "users", user.uid);
 
-    // Get existing watched array or empty
+    // existing watched or empty
     const existingArray = episodesWatchedMap[epi.showId] || [];
     const newEntry: WatchedEntry = {
       season: epi.season,
@@ -404,7 +441,7 @@ export default function ShowsPage() {
         ...prev,
         [epi.showId]: updatedArray,
       }));
-      // Also update the modalEpisode’s label to show watched date
+      // Update the modal label if it’s the same one open
       setModalEpisode((prev) =>
         prev &&
         prev.showId === epi.showId &&
@@ -420,15 +457,14 @@ export default function ShowsPage() {
   };
 
   /**
-   * When user clicks to “unwatch” (only after confirmation):
-   *   1) Remove that season/episode from Firestore array episodesWatched.<showId>
+   * When user clicks to “unwatch” (after confirmation):
+   *   1) Remove that (season,episode) from Firestore’s episodesWatched.<showId> array
    *   2) Update local state so UI re‐renders immediately
    */
   const unmarkAsWatched = async (epi: EpisodeInfo) => {
     if (!user) return;
     const userRef = doc(db, "users", user.uid);
 
-    // Filter out this (season, episode) pair
     const existingArray = episodesWatchedMap[epi.showId] || [];
     const updatedArray = existingArray.filter(
       (we) => !(we.season === epi.season && we.episode === epi.episode)
@@ -442,7 +478,7 @@ export default function ShowsPage() {
         ...prev,
         [epi.showId]: updatedArray,
       }));
-      // Do not close modal here; keep user on same episode if desired
+      // keep modal open if they want to re‐watch again
     } catch (err) {
       console.error(err);
       setError("Failed to unwatch that episode. Try again.");
@@ -453,25 +489,19 @@ export default function ShowsPage() {
   // Helper: render the card for one episode in the scroll list
   // ─────────────────────────────────────────────────────────────
   const renderEpisodeCard = (epi: EpisodeInfo) => {
-    // Build a unique key for this episode:
     const epiKey = `${epi.showId}-${epi.season}-${epi.episode}`;
-
-    // Determine whether user has already watched this episode:
     const watchedEntries = episodesWatchedMap[epi.showId] || [];
     const isWatched = watchedEntries.some(
       (we) => we.season === epi.season && we.episode === epi.episode
     );
-
-    // Is this episode currently in “animating → turning green” state?
     const isAnimating = animatingIds.has(epiKey);
 
     return (
       <div
         key={epiKey}
         style={styles.epiCard}
-        onClick={() => setModalEpisode(epi)} // open modal on card click
+        onClick={() => setModalEpisode(epi)}
       >
-        {/* Use the show’s poster here (epi.poster_path), not the episode’s still. */}
         {epi.poster_path ? (
           <img
             src={`${POSTER_BASE_URL}${epi.poster_path}`}
@@ -489,45 +519,32 @@ export default function ShowsPage() {
             <span style={styles.epiTitle}>{epi.episodeTitle}</span>
           )}
           {epi.episodeOverview && (
-            <p style={styles.epiOverview}>
-              {epi.episodeOverview /* full description, no truncation */}
-            </p>
+            <p style={styles.epiOverview}>{epi.episodeOverview}</p>
           )}
         </div>
 
-        {/* Nice circular button to mark watched (white → animate to green) */}
+        {/* Circular “✓” to mark watched (white → animate to green) */}
         <button
           onClick={(e) => {
-            e.stopPropagation(); // don’t open modal if button clicked
-
+            e.stopPropagation();
             if (!isWatched && !isAnimating) {
-              // 1) Put this epiKey into “animating” set
               setAnimatingIds((prev) => {
                 const copy = new Set(prev);
                 copy.add(epiKey);
                 return copy;
               });
-
-              // 2) After a brief delay (400 ms), mark watched & close modal
               setTimeout(() => {
                 markAsWatched(epi);
-
-                // 3) Remove from animating set
                 setAnimatingIds((prev) => {
                   const copy = new Set(prev);
                   copy.delete(epiKey);
                   return copy;
                 });
-
-                // 4) Close any open modal (no auto-advance)
                 setModalEpisode(null);
-              }, 400); // 400ms for the white→green transition
+              }, 400);
             }
           }}
           style={{
-            // If already watched → gray badge. Otherwise:
-            //   - if animating → green background + white check
-            //   - if not yet pressed → white circle + dark check
             ...(isWatched
               ? styles.cardWatchedBadge
               : {
@@ -621,7 +638,7 @@ export default function ShowsPage() {
           style={styles.modalOverlay}
           onClick={() => setModalEpisode(null)}
         >
-          {/* ─────────── Left‐side arrow (sits outside the modalContent) ─────────── */}
+          {/* ─────────── Left Arrow (outside modalContent) ─────────── */}
           <button
             style={styles.modalArrowLeft}
             onClick={async (e) => {
@@ -661,14 +678,14 @@ export default function ShowsPage() {
             <button
               style={styles.modalBackButton}
               onClick={() => {
-                // For now, go back to /shows. Later you can replace with `/shows/${modalEpisode.showId}`
+                // For now, go back to /shows.
                 window.location.href = "/shows";
               }}
             >
               ← Back to Show
             </button>
 
-            {/* ─────────── Episode Still Image with Overlays ─────────── */}
+            {/* ─────────── Episode Banner Image + Overlay ─────────── */}
             <div style={styles.modalImageWrapper}>
               {modalEpisode.still_path ? (
                 <img
@@ -679,8 +696,7 @@ export default function ShowsPage() {
               ) : (
                 <div style={styles.modalNoImage}>No Image</div>
               )}
-
-              {/* Overlay: Season/Episode + Episode Title */}
+              {/* Overlay: Season/Episode + Title */}
               <div style={styles.modalOverlayText}>
                 <span style={styles.modalOverlaySE}>
                   S{modalEpisode.season} | E{modalEpisode.episode}
@@ -693,16 +709,15 @@ export default function ShowsPage() {
               </div>
             </div>
 
-            {/* ─────────── “Where to Watch” Placeholder Section ─────────── */}
+            {/* ─────────── “Where to Watch” Placeholder ─────────── */}
             <div style={styles.modalWhereToWatchSection}>
               <h3 style={styles.modalWhereToWatchHeader}>Where to watch</h3>
               <button style={styles.modalNetflixButton}>NETFLIX</button>
-              {/* (You can add other streaming buttons here.) */}
             </div>
 
             {/* ─────────── Episode Info Section ─────────── */}
             <div style={styles.modalInfo}>
-              {/* Air Date / “Not watched” or watched date / Rating / Check‐button */}
+              {/* ─── Air Date / “Not watched”~“Watched on” / Rating / ✓ button ─── */}
               <div style={styles.modalAirRatingRow}>
                 <p style={styles.modalAirDate}>
                   Air Date: {modalEpisode.air_date || "Unknown"}
@@ -726,25 +741,22 @@ export default function ShowsPage() {
                   {Math.round(modalEpisode.vote_average * 10)}%
                 </p>
 
+                {/* Always show a circular “✓” here (same style as card buttons) */}
                 {(() => {
                   const watchedEntries =
                     episodesWatchedMap[modalEpisode.showId] || [];
-                  const isAlready =
-                    watchedEntries.some(
-                      (we) =>
-                        we.season === modalEpisode.season &&
-                        we.episode === modalEpisode.episode
-                    );
-                  // Always show the circular button, regardless of watched status
+                  const isAlready = watchedEntries.some(
+                    (we) =>
+                      we.season === modalEpisode.season &&
+                      we.episode === modalEpisode.episode
+                  );
                   return (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         if (!isAlready) {
-                          // Not watched yet → mark as watched immediately
                           markAsWatched(modalEpisode);
                         } else {
-                          // Already watched → ask for confirmation to unwatch
                           const confirmUnwatch = window.confirm(
                             "This episode is already marked as watched. Do you want to unwatch it?"
                           );
@@ -754,18 +766,11 @@ export default function ShowsPage() {
                         }
                       }}
                       style={
-                        // If episode is watched → show gray badge style.
-                        // Otherwise → show white circle style.
-                        watchedEntries.some(
-                          (we) =>
-                            we.season === modalEpisode.season &&
-                            we.episode === modalEpisode.episode
-                        )
+                        isAlready
                           ? styles.cardWatchedBadge
                           : styles.cardWatchBtn
                       }
                     >
-                      { /* Show a checkmark in both cases */ }
                       ✔️
                     </button>
                   );
@@ -784,7 +789,7 @@ export default function ShowsPage() {
             </div>
           </div>
 
-          {/* ─────────── Right‐side arrow (sits outside the modalContent) ─────────── */}
+          {/* ─────────── Right Arrow (outside modalContent) ─────────── */}
           <button
             style={styles.modalArrowRight}
             onClick={async (e) => {
@@ -978,7 +983,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 
   // ────────────────────────────────────────────────────────────────────────────
-  // Back-to-Show Button (top-left)
+  // Back‐to‐Show Button (top‐left)
   // ────────────────────────────────────────────────────────────────────────────
   modalBackButton: {
     position: "absolute",
@@ -1066,7 +1071,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 
   // ────────────────────────────────────────────────────────────────────────────
-  // Episode Info row: Air date / “Not watched” or watched date / Rating / Check‐button
+  // Episode Info row: Air date / “Not watched” or watched date / Rating / ✓ button
   // ────────────────────────────────────────────────────────────────────────────
   modalInfo: {
     display: "flex",
@@ -1119,27 +1124,13 @@ const styles: { [key: string]: React.CSSProperties } = {
     color: "#ddd",
   },
 
-  modalMarkAsWatchedBtn: {
-    alignSelf: "flex-start",
-    backgroundColor: "#28a745",
-    border: "none",
-    borderRadius: "50%",
-    color: "#fff",
-    fontSize: "1.2rem",
-    lineHeight: 1,
-    width: "48px",
-    height: "48px",
-    cursor: "pointer",
-    margin: "1rem",
-  },
-
   // ────────────────────────────────────────────────────────────────────────────
-  // “Previous” Arrow (left) now sits outside modalContent
+  // “Previous” Arrow (left)
   // ────────────────────────────────────────────────────────────────────────────
   modalArrowLeft: {
     position: "absolute",
-    top: "calc(50% - 10px)",  // vertically center on the still‐image area
-    left: "25%",              // arrow sits to left side of centered modalContent
+    top: "calc(50% - 10px)",
+    left: "25%",
     transform: "translateX(-100%) translateY(-50%)",
     backgroundColor: "rgba(255,255,255,0.8)",
     border: "none",
@@ -1154,11 +1145,11 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 
   // ────────────────────────────────────────────────────────────────────────────
-  // “Next” Arrow (right) now sits outside modalContent
+  // “Next” Arrow (right)
   // ────────────────────────────────────────────────────────────────────────────
   modalArrowRight: {
     position: "absolute",
-    top: "calc(50% - 10px)",  // vertically center on the still‐image area
+    top: "calc(50% - 10px)",
     right: "25%",
     transform: "translateX(100%) translateY(-50%)",
     backgroundColor: "rgba(255,255,255,0.8)",
