@@ -1,6 +1,6 @@
 // src/components/ShowsPage.tsx
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
@@ -142,6 +142,7 @@ export default function ShowsPage() {
   const lastScrollTop = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const historyContainerRef = useRef<HTMLDivElement>(null);
+  const prevHistoryHeightRef = useRef<number>(0);
   const [historyInitialized, setHistoryInitialized] = useState(false);
 
 
@@ -465,6 +466,21 @@ useEffect(() => {
   }
 }, [watchedHistory, historyInitialized]);
 
+useLayoutEffect(() => {
+  // As soon as historyCount grows, measure how much taller the history
+  // container became and shift scrollTop downward by that delta.
+  if (
+    historyContainerRef.current !== null &&
+    scrollRef.current !== null &&
+    prevHistoryHeightRef.current > 0
+  ) {
+    const newHeight = historyContainerRef.current.scrollHeight;
+    const delta = newHeight - prevHistoryHeightRef.current;
+    scrollRef.current.scrollTop += delta;
+    prevHistoryHeightRef.current = 0;
+  }
+}, [historyCount]);
+
 
   /**
    * When user clicks “✔️” to mark this episode as watched:
@@ -674,6 +690,9 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
     // load 5 more:
     if (curr < 50 && lastScrollTop.current > curr) {
       if (historyCount < watchedHistory.length) {
+        if (historyContainerRef.current) {
+          prevHistoryHeightRef.current = historyContainerRef.current.scrollHeight;
+        }
         setHistoryCount((prev) => prev + 5);
       }
     }
