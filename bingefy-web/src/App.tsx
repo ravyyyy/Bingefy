@@ -21,7 +21,7 @@ import logoSrc from "./assets/bingefy_text_logo.png";
 // Main “tabs” layout, which should render an <Outlet> inside
 // so its nested child routes ("shows", "movies", etc.) appear.
 import { TabsLayout } from "./components/TabsLayout";
-import { ShowsPage } from "./components/ShowsPage";
+import ShowsPage from "./components/ShowsPage";
 import { MoviesPage } from "./components/MoviesPage";
 import { ExplorePage } from "./components/ExplorePage";
 import { ProfilePage } from "./components/ProfilePage";

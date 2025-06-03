@@ -48,7 +48,9 @@ interface TmdbResponse<T> {
 /**
  * Fetch the most recently released movies (descending by release_date).
  */
-export async function getLatestMovies(page: number = 1): Promise<TmdbResponse<Movie>> {
+export async function getLatestMovies(
+  page: number = 1
+): Promise<TmdbResponse<Movie>> {
   const url = new URL(`${BASE_URL}/discover/movie`);
   url.searchParams.set("api_key", API_KEY);
   url.searchParams.set("language", "en-US");
@@ -65,7 +67,9 @@ export async function getLatestMovies(page: number = 1): Promise<TmdbResponse<Mo
 /**
  * Fetch the most recently aired TV shows (descending by first_air_date).
  */
-export async function getLatestTV(page: number = 1): Promise<TmdbResponse<TVShow>> {
+export async function getLatestTV(
+  page: number = 1
+): Promise<TmdbResponse<TVShow>> {
   const url = new URL(`${BASE_URL}/discover/tv`);
   url.searchParams.set("api_key", API_KEY);
   url.searchParams.set("language", "en-US");
@@ -101,7 +105,7 @@ export async function getLatestMedia(
 
   const tvItems: MediaItem[] = tvResp.results.map((t) => ({
     id: t.id,
-    title: t.name, // use “name” for TV show titles
+    title: t.name,
     overview: t.overview,
     poster_path: t.poster_path,
     vote_average: t.vote_average,
@@ -109,7 +113,10 @@ export async function getLatestMedia(
   }));
 
   // Intersect total_pages so we don't exceed either
-  const combinedTotalPages = Math.min(moviesResp.total_pages, tvResp.total_pages);
+  const combinedTotalPages = Math.min(
+    moviesResp.total_pages,
+    tvResp.total_pages
+  );
 
   return {
     page,
@@ -125,7 +132,9 @@ export async function getLatestMedia(
 /**
  * Fetch trending TV shows over the last week.
  */
-export async function getTrendingShows(page: number = 1): Promise<TmdbResponse<TVShow>> {
+export async function getTrendingShows(
+  page: number = 1
+): Promise<TmdbResponse<TVShow>> {
   const url = new URL(`${BASE_URL}/trending/tv/week`);
   url.searchParams.set("api_key", API_KEY);
   url.searchParams.set("page", String(page));
@@ -140,7 +149,9 @@ export async function getTrendingShows(page: number = 1): Promise<TmdbResponse<T
 /**
  * Fetch the most popular TV shows (by number of viewers).
  */
-export async function getPopularShows(page: number = 1): Promise<TmdbResponse<TVShow>> {
+export async function getPopularShows(
+  page: number = 1
+): Promise<TmdbResponse<TVShow>> {
   const url = new URL(`${BASE_URL}/tv/popular`);
   url.searchParams.set("api_key", API_KEY);
   url.searchParams.set("language", "en-US");
@@ -156,7 +167,9 @@ export async function getPopularShows(page: number = 1): Promise<TmdbResponse<TV
 /**
  * Fetch the most popular movies (by number of votes and views).
  */
-export async function getPopularMovies(page: number = 1): Promise<TmdbResponse<Movie>> {
+export async function getPopularMovies(
+  page: number = 1
+): Promise<TmdbResponse<Movie>> {
   const url = new URL(`${BASE_URL}/movie/popular`);
   url.searchParams.set("api_key", API_KEY);
   url.searchParams.set("language", "en-US");
@@ -167,4 +180,33 @@ export async function getPopularMovies(page: number = 1): Promise<TmdbResponse<M
     throw new Error(`TMDB Error (popular movies): ${response.status}`);
   }
   return (await response.json()) as TmdbResponse<Movie>;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4) NEW: Fetch full TV show details, including next_episode_to_air
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Fetch full details for a single TV show (including `next_episode_to_air`).
+ */
+export async function getTVShowDetails(
+  showId: number
+): Promise<
+  TVShow & {
+    next_episode_to_air?: { season_number: number; episode_number: number };
+  }
+> {
+  const url = new URL(`${BASE_URL}/tv/${showId}`);
+  url.searchParams.set("api_key", API_KEY);
+  url.searchParams.set("language", "en-US");
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error(
+      `TMDB Error (get TV details for ID ${showId}): ${response.status}`
+    );
+  }
+  return (await response.json()) as TVShow & {
+    next_episode_to_air?: { season_number: number; episode_number: number };
+  };
 }
