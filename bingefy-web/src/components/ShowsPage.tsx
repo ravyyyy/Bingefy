@@ -196,6 +196,17 @@ export default function ShowsPage() {
   const prevHistoryHeightRef = useRef<number>(0);
   const [historyInitialized, setHistoryInitialized] = useState(false);
 
+  useEffect(() => {
+  // Whenever we switch _into_ the “Watch List” tab (activeTab === 0),
+  // restore historyCount → 5 and historyInitialized → false so that
+  // it “feels fresh” exactly as on first load.
+  if (activeTab === 0) {
+    setHistoryCount(5);
+    setHistoryInitialized(false);
+  }
+}, [activeTab]);
+
+
 
   // One list for the “Upcoming” tab
   const [upcomingList, setUpcomingList] = useState<EpisodeInfo[]>([]);
