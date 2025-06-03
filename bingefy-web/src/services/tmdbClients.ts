@@ -23,6 +23,7 @@ export interface TVShow {
   poster_path: string | null;
   first_air_date: string;
   vote_average: number;
+  number_of_seasons: number;
 }
 
 export interface MediaItem {
@@ -188,7 +189,9 @@ export async function getTVShowDetails(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 5) NEW: Get Episode Details (season & episode)
+// 5) Get Episode Details (season & episode)
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface EpisodeDetail {
   name: string;
   overview: string;
@@ -218,4 +221,41 @@ export async function getEpisodeDetails(
     );
   }
   return (await response.json()) as EpisodeDetail;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6) Get Season Details (returns list of all episodes in that season)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface SeasonEpisodeDetail {
+  episode_number: number;
+  name: string;
+  overview: string;
+  air_date: string;
+  still_path: string | null;
+  vote_average: number;
+}
+
+export interface SeasonDetail {
+  id: number;
+  episodes: SeasonEpisodeDetail[];
+  season_number: number;
+  // (Other fields can be ignored; we only need `episodes[]`.)
+}
+
+export async function getSeasonDetails(
+  showId: number,
+  seasonNum: number
+): Promise<SeasonDetail> {
+  const url = new URL(`${BASE_URL}/tv/${showId}/season/${seasonNum}`);
+  url.searchParams.set("api_key", API_KEY);
+  url.searchParams.set("language", "en-US");
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error(
+      `TMDB Error (get season details for show ${showId}, season ${seasonNum}): ${response.status}`
+    );
+  }
+  return (await response.json()) as SeasonDetail;
 }

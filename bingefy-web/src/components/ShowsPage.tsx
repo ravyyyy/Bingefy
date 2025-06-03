@@ -8,8 +8,10 @@ import {
   getLatestTV,
   getTVShowDetails,
   getEpisodeDetails,
+  getSeasonDetails,
   type TVShow,
   type EpisodeDetail,
+  type SeasonDetail,
 } from "../services/tmdbClients";
 import type { DocumentData } from "firebase/firestore";
 
@@ -42,8 +44,8 @@ interface EpisodeInfo {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helper: remove any duplicate (season,episode) pairs and keep only
-//         the one with the greatest watchedAt timestamp.
+// Helper #1: Remove any duplicate (season,episode) and keep only the one
+//            with the latest watchedAt timestamp. (Prevents “double counting.”)
 // ─────────────────────────────────────────────────────────────────────────────
 function dedupeWatchedEntries(entries: WatchedEntry[]): WatchedEntry[] {
   const map: Record<string, WatchedEntry> = {};
@@ -57,48 +59,61 @@ function dedupeWatchedEntries(entries: WatchedEntry[]): WatchedEntry[] {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helper: given a showId, current (season, episode) and a direction ("prev" or "next"),
-//           attempt to fetch that sibling episode via TMDB. Returns EpisodeDetail or null.
+// Helper #2: Find the “very first unwatched episode” for a show.
+//   • We fetch season details one season at a time (1 → 2 → 3 → …) until we
+//     find a season where not every episode is in the watched set.
+//   • Then we locate the smallest episode_number in that season which is not watched.
+//   • If _every_ episode in _every_ season is already watched, return null.
 // ─────────────────────────────────────────────────────────────────────────────
-async function fetchSiblingEpisode(
+async function findFirstUnwatchedEpisode(
   showId: number,
-  currentSeason: number,
-  currentEpisode: number,
-  direction: "prev" | "next"
-): Promise<EpisodeDetail | null> {
-  if (direction === "prev") {
-    // 1) If there is a previous episode in the same season:
-    if (currentEpisode > 1) {
-      try {
-        return await getEpisodeDetails(showId, currentSeason, currentEpisode - 1);
-      } catch {
-        return null;
-      }
-    }
-    // 2) If we're at episode 1 of season > 1, go back to season-1, episode 1
-    if (currentSeason > 1) {
-      try {
-        return await getEpisodeDetails(showId, currentSeason - 1, 1);
-      } catch {
-        return null;
-      }
-    }
-    // 3) Otherwise, no previous
-    return null;
-  } else {
-    // direction === "next"
-    // 1) Try same season, next episode
-    try {
-      return await getEpisodeDetails(showId, currentSeason, currentEpisode + 1);
-    } catch {
-      // 2) If that 404’s, try next season episode 1
-      try {
-        return await getEpisodeDetails(showId, currentSeason + 1, 1);
-      } catch {
-        return null;
-      }
-    }
+  deduped: WatchedEntry[]
+): Promise<{
+  season: number;
+  episode: number;
+  episodeDetail: EpisodeDetail;
+} | null> {
+  // 1) Build a Set<string> of "S|E" for fast membership checks:
+  const watchedSet = new Set<string>();
+  for (const we of deduped) {
+    watchedSet.add(`${we.season}|${we.episode}`);
   }
+
+  // 2) Fetch show details to know how many seasons there are:
+  const showDet = await getTVShowDetails(showId);
+  const totalSeasons = showDet.number_of_seasons || 0;
+
+  // 3) Iterate seasons 1 → totalSeasons:
+  for (let seasonNum = 1; seasonNum <= totalSeasons; seasonNum++) {
+    let seasonObj: SeasonDetail;
+    try {
+      seasonObj = await getSeasonDetails(showId, seasonNum);
+    } catch {
+      // If TMDB 404s on a season (rare), skip it:
+      continue;
+    }
+    // 4) Build a sorted list of episode_numbers in that season:
+    const episodesInThisSeason = seasonObj.episodes
+      .map((ep) => ep.episode_number)
+      .sort((a, b) => a - b);
+
+    // 5) Walk through each epNum in ascending order. The first one missing from watchedSet is our answer:
+    for (const epNum of episodesInThisSeason) {
+      if (!watchedSet.has(`${seasonNum}|${epNum}`)) {
+        // Found our first-unwatched in this season
+        const epDetail = await getEpisodeDetails(showId, seasonNum, epNum);
+        return {
+          season: seasonNum,
+          episode: epNum,
+          episodeDetail: epDetail,
+        };
+      }
+    }
+    // If we get here, that entire season is fully watched. Move on to next season.
+  }
+
+  // 6) If we exit loop, every single season + episode is watched:
+  return null;
 }
 
 export default function ShowsPage() {
@@ -185,159 +200,103 @@ export default function ShowsPage() {
           now.getTime() - 30 * 24 * 60 * 60 * 1000
         ).toISOString();
 
-        // Temporary arrays of “candidates” (with empty data initially)
-        type Candidate = { showId: number; season: number; episode: number; label: string };
-        const nextArr: Candidate[] = [];
-        const aWhileArr: Candidate[] = [];
-        const notStartedArr: Candidate[] = [];
+        // Temporary holders for each category
+        const nextArr: EpisodeInfo[] = [];
+        const aWhileArr: EpisodeInfo[] = [];
+        const notStartedArr: EpisodeInfo[] = [];
 
+        // 1) For each showId, figure out the “first unwatched” via our helper
         for (const showId of onboardedIds) {
-          // ─────────── De‐duplicate (season,episode) pairs ───────────
           const rawEntries = episodesWatchedMap[showId] || [];
+          // Deduplicate on (season,episode) keeping only the latest watchedAt:
           const uniqueEntries = dedupeWatchedEntries(rawEntries);
 
+          // If there are NO watched entries at all, we immediately know “first unwatched” = S1E1:
           if (uniqueEntries.length === 0) {
-            // Never watched → “Haven’t Started”: Season 1 Episode 1
-            notStartedArr.push({ showId, season: 1, episode: 1, label: "S1 E1" });
+            // Fetch details for S1 E1 to fill everything in:
+            try {
+              const epDet = await getEpisodeDetails(showId, 1, 1);
+              const showDet = await getTVShowDetails(showId);
+              notStartedArr.push({
+                showId,
+                showName: showDet.name,
+                poster_path: showDet.poster_path,
+                season: 1,
+                episode: 1,
+                label: "S1 E1",
+                episodeTitle: epDet.name,
+                episodeOverview: epDet.overview,
+                air_date: epDet.air_date,
+                still_path: epDet.still_path,
+                vote_average: epDet.vote_average || 0,
+              });
+            } catch {
+              // If TMDB says S1E1 doesn’t exist (rare), skip entirely.
+            }
             continue;
           }
 
-          // Sort the de-duplicated list by watchedAt descending
-          uniqueEntries.sort(
-            (a, b) => new Date(b.watchedAt).getTime() - new Date(a.watchedAt).getTime()
+          // Otherwise, at least one watched entry exists.  Find the first truly unwatched:
+          const firstUnwatched = await findFirstUnwatchedEpisode(
+            showId,
+            uniqueEntries
           );
-          const mostRecent = uniqueEntries[0];
-          const lastSeason  = mostRecent.season;
-          const lastEpisode = mostRecent.episode;
 
-          if (mostRecent.watchedAt > thirtyDaysAgo) {
-            // Watched in last 30 days → “Watch Next”
-            nextArr.push({
-              showId,
-              season: lastSeason,
-              episode: lastEpisode + 1,
-              label: `S${lastSeason} E${lastEpisode + 1}`,
-            });
-          } else {
-            // Watched > 30 days ago → “Haven’t Watched For A While”
-            aWhileArr.push({
-              showId,
-              season: lastSeason,
-              episode: lastEpisode + 1,
-              label: `Last seen S${lastSeason} E${lastEpisode}`,
-            });
+          // If null → every episode in every season is already watched → skip this show entirely.
+          if (firstUnwatched === null) {
+            continue;
           }
-        }
 
-        // ─────────── (2a) Pre‐load show details for every candidate showId ───────────
-        const allCandidates = [...nextArr, ...aWhileArr, ...notStartedArr];
-        const uniqueShowIds = Array.from(
-          new Set(allCandidates.map((e) => e.showId))
-        );
-        const detailsMap: Record<number, TVShow> = {};
-        await Promise.all(
-          uniqueShowIds.map(async (sid) => {
-            const det = await getTVShowDetails(sid);
-            detailsMap[sid] = det;
-          })
-        );
+          // We do have a “next candidate”:
+          const { season, episode, episodeDetail } = firstUnwatched;
+          const showDet = await getTVShowDetails(showId);
+          const epiLabel = `S${season} E${episode}`;
 
-        // ─────────── (2b) Build “finalized” lists, but only if TMDB confirms the episode exists ───────────
-        const finalizedNext: EpisodeInfo[] = [];
-        const finalizedAWhile: EpisodeInfo[] = [];
-        const finalizedNotStarted: EpisodeInfo[] = [];
+          // We still need to categorize into NEXT vs. AWHILE:
+          //   – Grab the single “most recent watched” timestamp:
+          const latestWatched = uniqueEntries.sort(
+            (a, b) =>
+              new Date(b.watchedAt).getTime() -
+              new Date(a.watchedAt).getTime()
+          )[0];
 
-        // Helper: fetch an episode to see if it exists (returns EpisodeInfo or null)
-        const tryBuildEpisode = async (
-          showId: number,
-          season: number,
-          episode: number,
-          label: string
-        ): Promise<EpisodeInfo | null> => {
-          // 1) Try (season, episode)
-          try {
-            const epDet = await getEpisodeDetails(showId, season, episode);
-            const showDet = detailsMap[showId];
-            return {
+          if (new Date(latestWatched.watchedAt) > new Date(thirtyDaysAgo)) {
+            // “Watched within last 30 days” → put into WATCH NEXT
+            nextArr.push({
               showId,
               showName: showDet.name,
               poster_path: showDet.poster_path,
               season,
               episode,
-              label,
-              episodeTitle: epDet.name || "",
-              episodeOverview: epDet.overview || "",
-              air_date: epDet.air_date || "",
-              still_path: epDet.still_path || null,
-              vote_average: epDet.vote_average || 0,
-            };
-          } catch {
-            // 2) If that 404’d, try (season+1, 1)
-            const nextSeason = season + 1;
-            try {
-              const epDet2 = await getEpisodeDetails(showId, nextSeason, 1);
-              const showDet2 = detailsMap[showId];
-              return {
-                showId,
-                showName: showDet2.name,
-                poster_path: showDet2.poster_path,
-                season: nextSeason,
-                episode: 1,
-                label: `S${nextSeason} E1`,
-                episodeTitle: epDet2.name || "",
-                episodeOverview: epDet2.overview || "",
-                air_date: epDet2.air_date || "",
-                still_path: epDet2.still_path || null,
-                vote_average: epDet2.vote_average || 0,
-              };
-            } catch {
-              // 3) If that also 404’d, there truly is no “next” → return null.
-              return null;
-            }
+              label: epiLabel,
+              episodeTitle: episodeDetail.name,
+              episodeOverview: episodeDetail.overview,
+              air_date: episodeDetail.air_date,
+              still_path: episodeDetail.still_path,
+              vote_average: episodeDetail.vote_average || 0,
+            });
+          } else {
+            // “More than 30 days ago” → put into “HAVEN’T WATCHED FOR A WHILE”
+            aWhileArr.push({
+              showId,
+              showName: showDet.name,
+              poster_path: showDet.poster_path,
+              season,
+              episode,
+              label: epiLabel,
+              episodeTitle: episodeDetail.name,
+              episodeOverview: episodeDetail.overview,
+              air_date: episodeDetail.air_date,
+              still_path: episodeDetail.still_path,
+              vote_average: episodeDetail.vote_average || 0,
+            });
           }
-        };
+        }
 
-        // Build finalizedNext
-        await Promise.all(
-          nextArr.map(async (cand) => {
-            const epiInfo = await tryBuildEpisode(
-              cand.showId,
-              cand.season,
-              cand.episode,
-              cand.label
-            );
-            if (epiInfo) finalizedNext.push(epiInfo);
-          })
-        );
-        // Build finalizedAWhile
-        await Promise.all(
-          aWhileArr.map(async (cand) => {
-            const epiInfo = await tryBuildEpisode(
-              cand.showId,
-              cand.season,
-              cand.episode,
-              cand.label
-            );
-            if (epiInfo) finalizedAWhile.push(epiInfo);
-          })
-        );
-        // Build finalizedNotStarted
-        await Promise.all(
-          notStartedArr.map(async (cand) => {
-            const epiInfo = await tryBuildEpisode(
-              cand.showId,
-              cand.season,
-              cand.episode,
-              cand.label
-            );
-            if (epiInfo) finalizedNotStarted.push(epiInfo);
-          })
-        );
-
-        // Finally push into state
-        setWatchNextList(finalizedNext);
-        setWatchedAWhileList(finalizedAWhile);
-        setNotStartedList(finalizedNotStarted);
+        // 2) Finally, set our state arrays:
+        setWatchNextList(nextArr);
+        setWatchedAWhileList(aWhileArr);
+        setNotStartedList(notStartedArr);
       } catch (err) {
         console.error(err);
         setError("Failed to build your watch categories.");
@@ -416,7 +375,7 @@ export default function ShowsPage() {
 
   /**
    * When user clicks “✔️” to mark this episode as watched:
-   *   1) Append a new WatchedEntry to Firestore → episodesWatched.<showId>
+   *   1) Append a new WatchedEntry to Firestore: episodesWatched.<showId>
    *   2) Update local state so UI re‐renders immediately
    */
   const markAsWatched = async (epi: EpisodeInfo) => {
@@ -424,7 +383,6 @@ export default function ShowsPage() {
     const nowISO = new Date().toISOString();
     const userRef = doc(db, "users", user.uid);
 
-    // existing watched or empty
     const existingArray = episodesWatchedMap[epi.showId] || [];
     const newEntry: WatchedEntry = {
       season: epi.season,
@@ -441,7 +399,8 @@ export default function ShowsPage() {
         ...prev,
         [epi.showId]: updatedArray,
       }));
-      // Update the modal label if it’s the same one open
+
+      // If modal is currently showing THIS episode, update its label:
       setModalEpisode((prev) =>
         prev &&
         prev.showId === epi.showId &&
@@ -457,9 +416,8 @@ export default function ShowsPage() {
   };
 
   /**
-   * When user clicks to “unwatch” (after confirmation):
-   *   1) Remove that (season,episode) from Firestore’s episodesWatched.<showId> array
-   *   2) Update local state so UI re‐renders immediately
+   * When user clicks the ✓ in the modal (if already watched), confirm they
+   * want to “unwatch” and then remove from Firestore + local state:
    */
   const unmarkAsWatched = async (epi: EpisodeInfo) => {
     if (!user) return;
@@ -478,7 +436,6 @@ export default function ShowsPage() {
         ...prev,
         [epi.showId]: updatedArray,
       }));
-      // keep modal open if they want to re‐watch again
     } catch (err) {
       console.error(err);
       setError("Failed to unwatch that episode. Try again.");
@@ -523,10 +480,10 @@ export default function ShowsPage() {
           )}
         </div>
 
-        {/* Circular “✓” to mark watched (white → animate to green) */}
+        {/* “✓” to mark watched (white → animate to green) */}
         <button
           onClick={(e) => {
-            e.stopPropagation();
+            e.stopPropagation(); // don’t open modal if button clicked
             if (!isWatched && !isAnimating) {
               setAnimatingIds((prev) => {
                 const copy = new Set(prev);
@@ -643,26 +600,62 @@ export default function ShowsPage() {
             style={styles.modalArrowLeft}
             onClick={async (e) => {
               e.stopPropagation();
-              const prevEp = await fetchSiblingEpisode(
-                modalEpisode.showId,
-                modalEpisode.season,
-                modalEpisode.episode,
-                "prev"
-              );
-              if (prevEp) {
-                const showDet = await getTVShowDetails(modalEpisode.showId);
+              if (!modalEpisode) return;
+
+              const { showId, season, episode } = modalEpisode;
+              let prevSeason = season;
+              let prevEpisode = episode - 1;
+              let prevEpDetail: EpisodeDetail | null = null;
+
+              // 1) Try (same season, episode−1):
+              if (prevEpisode >= 1) {
+                try {
+                  prevEpDetail = await getEpisodeDetails(
+                    showId,
+                    prevSeason,
+                    prevEpisode
+                  );
+                } catch {
+                  prevEpDetail = null;
+                }
+              }
+
+              // 2) If not found, attempt “last episode of (season−1)”:
+              if (!prevEpDetail && season > 1) {
+                const candidateSeason = season - 1;
+                try {
+                  const seasonInfo = await getSeasonDetails(showId, candidateSeason);
+                  // Find the maximum episode_number in that season
+                  const lastEpNum = Math.max(
+                    ...seasonInfo.episodes.map((e) => e.episode_number)
+                  );
+                  prevSeason = candidateSeason;
+                  prevEpisode = lastEpNum;
+                  prevEpDetail = await getEpisodeDetails(
+                    showId,
+                    prevSeason,
+                    prevEpisode
+                  );
+                } catch {
+                  prevEpDetail = null;
+                }
+              }
+
+              // 3) If we found previous, open it in modal:
+              if (prevEpDetail) {
+                const showDet = await getTVShowDetails(showId);
                 setModalEpisode({
-                  showId: modalEpisode.showId,
+                  showId,
                   showName: showDet.name,
                   poster_path: showDet.poster_path,
-                  season: prevEp.season_number,
-                  episode: prevEp.episode_number,
-                  label: `S${prevEp.season_number} E${prevEp.episode_number}`,
-                  episodeTitle: prevEp.name,
-                  episodeOverview: prevEp.overview,
-                  air_date: prevEp.air_date,
-                  still_path: prevEp.still_path,
-                  vote_average: prevEp.vote_average || 0,
+                  season: prevSeason,
+                  episode: prevEpisode,
+                  label: `S${prevSeason} E${prevEpisode}`,
+                  episodeTitle: prevEpDetail.name,
+                  episodeOverview: prevEpDetail.overview,
+                  air_date: prevEpDetail.air_date,
+                  still_path: prevEpDetail.still_path,
+                  vote_average: prevEpDetail.vote_average || 0,
                 });
               }
             }}
@@ -678,7 +671,6 @@ export default function ShowsPage() {
             <button
               style={styles.modalBackButton}
               onClick={() => {
-                // For now, go back to /shows.
                 window.location.href = "/shows";
               }}
             >
@@ -741,7 +733,7 @@ export default function ShowsPage() {
                   {Math.round(modalEpisode.vote_average * 10)}%
                 </p>
 
-                {/* Always show a circular “✓” here (same style as card buttons) */}
+                {/* ✓ “Mark/Unmark as Watched” (always present) */}
                 {(() => {
                   const watchedEntries =
                     episodesWatchedMap[modalEpisode.showId] || [];
@@ -794,26 +786,58 @@ export default function ShowsPage() {
             style={styles.modalArrowRight}
             onClick={async (e) => {
               e.stopPropagation();
-              const nextEp = await fetchSiblingEpisode(
-                modalEpisode.showId,
-                modalEpisode.season,
-                modalEpisode.episode,
-                "next"
-              );
-              if (nextEp) {
-                const showDet = await getTVShowDetails(modalEpisode.showId);
+              if (!modalEpisode) return;
+
+              const { showId, season, episode } = modalEpisode;
+              let nextSeason = season;
+              let nextEpisode = episode + 1;
+              let nextEpDetail: EpisodeDetail | null = null;
+
+              // 1) Try (same season, episode+1):
+              try {
+                nextEpDetail = await getEpisodeDetails(
+                  showId,
+                  nextSeason,
+                  nextEpisode
+                );
+              } catch {
+                nextEpDetail = null;
+              }
+
+              // 2) If not found, attempt “season+1, episode=1” (provided it exists):
+              if (!nextEpDetail) {
+                const showDet = await getTVShowDetails(showId);
+                if (season < showDet.number_of_seasons) {
+                  // attempt next season’s first episode
+                  nextSeason = season + 1;
+                  nextEpisode = 1;
+                  try {
+                    nextEpDetail = await getEpisodeDetails(
+                      showId,
+                      nextSeason,
+                      nextEpisode
+                    );
+                  } catch {
+                    nextEpDetail = null;
+                  }
+                }
+              }
+
+              // 3) If we found next, open it in modal:
+              if (nextEpDetail) {
+                const showDet = await getTVShowDetails(showId);
                 setModalEpisode({
-                  showId: modalEpisode.showId,
+                  showId,
                   showName: showDet.name,
                   poster_path: showDet.poster_path,
-                  season: nextEp.season_number,
-                  episode: nextEp.episode_number,
-                  label: `S${nextEp.season_number} E${nextEp.episode_number}`,
-                  episodeTitle: nextEp.name,
-                  episodeOverview: nextEp.overview,
-                  air_date: nextEp.air_date,
-                  still_path: nextEp.still_path,
-                  vote_average: nextEp.vote_average || 0,
+                  season: nextSeason,
+                  episode: nextEpisode,
+                  label: `S${nextSeason} E${nextEpisode}`,
+                  episodeTitle: nextEpDetail.name,
+                  episodeOverview: nextEpDetail.overview,
+                  air_date: nextEpDetail.air_date,
+                  still_path: nextEpDetail.still_path,
+                  vote_average: nextEpDetail.vote_average || 0,
                 });
               }
             }}
@@ -924,7 +948,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 
   // ────────────────────────────────────────────────────────────────────────────
-  // In‐card watch button styles (used both in the list and in the modal):
+  // In-card watch button styles (used in both the list and in the modal):
   // ────────────────────────────────────────────────────────────────────────────
   cardWatchBtn: {
     position: "absolute",
@@ -983,7 +1007,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 
   // ────────────────────────────────────────────────────────────────────────────
-  // Back‐to‐Show Button (top‐left)
+  // Back-to-Show Button (top-left)
   // ────────────────────────────────────────────────────────────────────────────
   modalBackButton: {
     position: "absolute",
@@ -1044,7 +1068,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 
   // ────────────────────────────────────────────────────────────────────────────
-  // “Where to  Watch” placeholder section inside modal
+  // “Where to Watch” placeholder section inside modal
   // ────────────────────────────────────────────────────────────────────────────
   modalWhereToWatchSection: {
     padding: "1rem",
@@ -1129,9 +1153,8 @@ const styles: { [key: string]: React.CSSProperties } = {
   // ────────────────────────────────────────────────────────────────────────────
   modalArrowLeft: {
     position: "absolute",
-    top: "calc(50% - 10px)",
-    left: "25%",
-    transform: "translateX(-100%) translateY(-50%)",
+    top: "calc(50% - 20px)",
+    left: "20px",
     backgroundColor: "rgba(255,255,255,0.8)",
     border: "none",
     color: "#000",
@@ -1149,9 +1172,8 @@ const styles: { [key: string]: React.CSSProperties } = {
   // ────────────────────────────────────────────────────────────────────────────
   modalArrowRight: {
     position: "absolute",
-    top: "calc(50% - 10px)",
-    right: "25%",
-    transform: "translateX(100%) translateY(-50%)",
+    top: "calc(50% - 20px)",
+    right: "20px",
     backgroundColor: "rgba(255,255,255,0.8)",
     border: "none",
     color: "#000",
