@@ -705,7 +705,7 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
     onClick={() => setActiveTab(0)}
     style={{
       ...styles.tabButton,
-      ...(activeTab === 0 ? styles.tabButtonActive : {}),
+      ...(activeTab === 0 ? styles.tabButtonActive : styles.tabInactive),
     }}
   >
     Watch List
@@ -714,7 +714,7 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
     onClick={() => setActiveTab(1)}
     style={{
       ...styles.tabButton,
-      ...(activeTab === 1 ? styles.tabButtonActive : {}),
+      ...(activeTab === 1 ? styles.tabButtonActive : styles.tabInactive),
     }}
   >
     Upcoming
@@ -1062,15 +1062,50 @@ const styles: { [key: string]: React.CSSProperties } = {
     /* Note: we no longer need overflow here, because scrolling is driven by .scrollable */
   },
   tabContainer: {
-  position: "sticky",
-  top: 0,
+    position: "sticky",
+    top: 0,
   display: "flex",
   justifyContent: "center",
-  gap: "1rem",
-  padding: "0.75rem 0",            // shrink or adjust as needed
-  backgroundColor: "#121212",     // make it pure black (“#000”) or match your main nav
-  zIndex: 20,
+  alignItems: "center",
+  height: "64px",
+  backgroundColor: "#111", 
+  zIndex: 10,
 },
+tabInactive: {
+    // exactly like TabsLayout.tsx .tab
+    display: "flex",
+    flexDirection: "column" as const,
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#888",
+    textDecoration: "none",
+    fontSize: "14px",
+    gap: "4px",
+    padding: "0 1rem",
+    height: "100%",
+    background: "none",
+    border: "none",
+    transition: "color 0.2s",
+    cursor: "pointer",
+  },
+  tabActive: {
+    // exactly like TabsLayout.tsx .activeTab
+    display: "flex",
+    flexDirection: "column" as const,
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#fff",
+    textDecoration: "none",
+    fontSize: "14px",
+    gap: "4px",
+    padding: "0 1rem",
+    height: "100%",
+    background: "none",
+    border: "none",
+    borderBottom: "3px solid #e50914",
+    transition: "color 0.2s, border-bottom 0.2s",
+    cursor: "pointer",
+  },
 tabButton: {
   background: "none",
   border: "none",
