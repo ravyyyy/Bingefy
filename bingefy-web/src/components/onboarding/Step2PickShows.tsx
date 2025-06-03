@@ -22,9 +22,15 @@ export function Step2PickShows() {
   const [selectedShows, setSelectedShows] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
-  // Refs for the two “Trending” rows and two “Most‐Added” rows
-  const trendingRefs = [useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null)];
-  const addedRefs = [useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null)];
+  // Refs for the two “Trending” rows and two “Most-Added” rows
+  const trendingRefs = [
+    useRef<HTMLDivElement>(null),
+    useRef<HTMLDivElement>(null),
+  ];
+  const addedRefs = [
+    useRef<HTMLDivElement>(null),
+    useRef<HTMLDivElement>(null),
+  ];
 
   // A ref to detect whether the user actually dragged (so we don’t toggle on drag)
   const didDragRef = useRef(false);
@@ -35,7 +41,7 @@ export function Step2PickShows() {
     return [arr.slice(0, half), arr.slice(half)];
   };
 
-  // Fetch two pages of Trending and two pages of Most‐Added
+  // Fetch two pages of Trending and two pages of Most-Added
   useEffect(() => {
     (async () => {
       try {
@@ -108,7 +114,7 @@ export function Step2PickShows() {
     });
   };
 
-  // “Next” and “Later” handlers
+  // “Next” handler
   const handleNext = async () => {
     if (!user) {
       setError("User not found. Please sign in again.");
@@ -130,18 +136,14 @@ export function Step2PickShows() {
     }
   };
 
-  const handleLater = async () => {
-    if (!user) return;
-    const userDocRef = doc(db, "users", user.uid);
-    await updateDoc(userDocRef, { showsOnboarded: [] });
-    navigate("/onboarding/step3");
-  };
-
-  // Generic “click‐and‐drag” horizontal scroll hook
-  function useHorizontalDragScroll(ref: React.RefObject<HTMLDivElement>) {
+  // Generic “click-and-drag” horizontal scroll hook
+  function useHorizontalDragScroll(ref: React.RefObject<HTMLDivElement | null>) {
     useEffect(() => {
       const element = ref.current;
       if (!element) return;
+
+      // Create a non-nullable alias so TS knows this cannot be null below:
+      const el: HTMLDivElement = element;
 
       let isDown = false;
       let startX = 0;
@@ -150,44 +152,44 @@ export function Step2PickShows() {
       function onMouseDown(e: MouseEvent) {
         isDown = true;
         didDragRef.current = false; // reset
-        startX = e.pageX - element.offsetLeft;
-        scrollLeft = element.scrollLeft;
-        element.classList.add("dragging");
+        startX = e.pageX - el.offsetLeft;
+        scrollLeft = el.scrollLeft;
+        el.classList.add("dragging");
       }
       function onMouseLeave() {
         isDown = false;
-        element.classList.remove("dragging");
+        el.classList.remove("dragging");
       }
       function onMouseUp(e: MouseEvent) {
-        if (isDown && Math.abs(e.pageX - (startX + element.offsetLeft)) > 5) {
+        if (isDown && Math.abs(e.pageX - (startX + el.offsetLeft)) > 5) {
           didDragRef.current = true;
         }
         isDown = false;
-        element.classList.remove("dragging");
+        el.classList.remove("dragging");
       }
       function onMouseMove(e: MouseEvent) {
         if (!isDown) return;
         e.preventDefault();
-        const x = e.pageX - element.offsetLeft;
+        const x = e.pageX - el.offsetLeft;
         const walk = (x - startX) * 1; // scroll speed = 1
-        element.scrollLeft = scrollLeft - walk;
+        el.scrollLeft = scrollLeft - walk;
       }
 
-      element.addEventListener("mousedown", onMouseDown);
-      element.addEventListener("mouseleave", onMouseLeave);
-      element.addEventListener("mouseup", onMouseUp);
-      element.addEventListener("mousemove", onMouseMove);
+      el.addEventListener("mousedown", onMouseDown);
+      el.addEventListener("mouseleave", onMouseLeave);
+      el.addEventListener("mouseup", onMouseUp);
+      el.addEventListener("mousemove", onMouseMove);
 
       return () => {
-        element.removeEventListener("mousedown", onMouseDown);
-        element.removeEventListener("mouseleave", onMouseLeave);
-        element.removeEventListener("mouseup", onMouseUp);
-        element.removeEventListener("mousemove", onMouseMove);
+        el.removeEventListener("mousedown", onMouseDown);
+        el.removeEventListener("mouseleave", onMouseLeave);
+        el.removeEventListener("mouseup", onMouseUp);
+        el.removeEventListener("mousemove", onMouseMove);
       };
     }, [ref]);
   }
 
-  // Attach drag‐scroll to each row
+  // Attach drag-scroll to each row
   trendingRefs.forEach((r) => useHorizontalDragScroll(r));
   addedRefs.forEach((r) => useHorizontalDragScroll(r));
 
@@ -197,27 +199,6 @@ export function Step2PickShows() {
 
   return (
     <div style={styles.container}>
-      {/* ─────────── TOP HEADER WITH “Next” & “Later” ─────────── */}
-      <div style={styles.topButtonsContainer}>
-        <button
-          onClick={handleLater}
-          style={styles.laterButton}
-        >
-          Later
-        </button>
-        <button
-          onClick={handleNext}
-          disabled={selectedShows.size === 0}
-          style={{
-            ...styles.nextButton,
-            opacity: selectedShows.size > 0 ? 1 : 0.5,
-            cursor: selectedShows.size > 0 ? "pointer" : "not-allowed",
-          }}
-        >
-          Next
-        </button>
-      </div>
-
       {/* ─────────── INSTRUCTIONS & ERROR ─────────── */}
       <p style={styles.instructions}>
         Choose TV shows you’ve watched, are watching, or plan to watch.
@@ -310,14 +291,8 @@ export function Step2PickShows() {
         ))}
       </div>
 
-      {/* ─────────── BOTTOM BUTTONS (OPTIONAL – can be removed) ─────────── */}
+      {/* ─────────── BOTTOM “Next” BUTTON ONLY ─────────── */}
       <div style={styles.bottomButtonsContainer}>
-        <button
-          onClick={handleLater}
-          style={styles.laterButton}
-        >
-          Later
-        </button>
         <button
           onClick={handleNext}
           disabled={selectedShows.size === 0}
@@ -336,20 +311,12 @@ export function Step2PickShows() {
 
 const styles: { [key: string]: React.CSSProperties } = {
   container: {
-    padding: "1rem",
+    /* 
+      Enough top padding so that none of the rows hide under your navbar.
+      If your navbar is ~60px tall, 80-100px will safely push content below it.
+    */
+    padding: "100px 1rem 1rem",
     color: "#fff",
-  },
-  topButtonsContainer: {
-    display: "flex",
-    justifyContent: "center",
-    gap: "1rem",
-    marginBottom: "1rem",
-  },
-  bottomButtonsContainer: {
-    display: "flex",
-    justifyContent: "center",
-    gap: "1rem",
-    marginTop: "2rem",
   },
   instructions: {
     fontSize: "1rem",
@@ -376,13 +343,10 @@ const styles: { [key: string]: React.CSSProperties } = {
     borderRadius: "4px",
     transition: "opacity 0.2s",
   },
-  laterButton: {
-    padding: "0.5rem 1rem",
-    backgroundColor: "#555",
-    color: "#fff",
-    border: "none",
-    borderRadius: "4px",
-    cursor: "pointer",
+  bottomButtonsContainer: {
+    display: "flex",
+    justifyContent: "center",
+    marginTop: "2rem",
   },
   nextButton: {
     padding: "0.5rem 1rem",
