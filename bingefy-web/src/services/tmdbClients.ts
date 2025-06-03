@@ -195,6 +195,7 @@ export interface EpisodeDetail {
   air_date: string;
   episode_number: number;
   season_number: number;
+  still_path: string | null;
 }
 
 export async function getEpisodeDetails(
