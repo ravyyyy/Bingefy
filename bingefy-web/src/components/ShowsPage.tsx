@@ -135,6 +135,10 @@ export default function ShowsPage() {
   const [watchedAWhileList, setWatchedAWhileList] = useState<EpisodeInfo[]>([]);
   const [notStartedList, setNotStartedList] = useState<EpisodeInfo[]>([]);
 
+  // One list for the “Watched History” above Watch Next
+  const [watchedHistory, setWatchedHistory] = useState<EpisodeInfo[]>([]);
+  const [historyCount, setHistoryCount] = useState(5);
+
   // One list for the “Upcoming” tab
   const [upcomingList, setUpcomingList] = useState<EpisodeInfo[]>([]);
 
@@ -373,6 +377,72 @@ export default function ShowsPage() {
     })();
   }, [onboardedIds]);
 
+  // ─────────────────────────────────────────────────────────────
+// 4) Build “Watched History” list (sorted by watchedAt descending)
+//    whenever episodesWatchedMap changes
+// ─────────────────────────────────────────────────────────────
+useEffect(() => {
+  const buildHistory = async () => {
+    // 1) Flatten all watched entries into one array
+    let entries: {
+      showId: number;
+      season: number;
+      episode: number;
+      watchedAt: string;
+    }[] = [];
+
+    Object.entries(episodesWatchedMap).forEach(([showId, watchArr]) => {
+      watchArr.forEach((we) =>
+        entries.push({
+          showId: Number(showId),
+          season: we.season,
+          episode: we.episode,
+          watchedAt: we.watchedAt,
+        })
+      );
+    });
+
+    // 2) Sort descending by watchedAt
+    entries.sort(
+      (a, b) =>
+        new Date(b.watchedAt).getTime() - new Date(a.watchedAt).getTime()
+    );
+
+    // 3) Fetch details for each entry & build EpisodeInfo objects
+    const result: EpisodeInfo[] = [];
+    for (const { showId, season, episode, watchedAt } of entries) {
+      try {
+        const epDet: EpisodeDetail = await getEpisodeDetails(
+          showId,
+          season,
+          episode
+        );
+        const showDet = await getTVShowDetails(showId);
+
+        result.push({
+          showId,
+          showName: showDet.name,
+          poster_path: showDet.poster_path,
+          season,
+          episode,
+          label: `Watched ${watchedAt.split("T")[0]}`,
+          episodeTitle: epDet.name,
+          episodeOverview: epDet.overview,
+          air_date: epDet.air_date,
+          still_path: epDet.still_path,
+          vote_average: epDet.vote_average || 0,
+        });
+      } catch {
+        continue;
+      }
+    }
+
+    setWatchedHistory(result);
+  };
+
+  buildHistory();
+}, [episodesWatchedMap]);
+
   /**
    * When user clicks “✔️” to mark this episode as watched:
    *   1) Append a new WatchedEntry to Firestore: episodesWatched.<showId>
@@ -441,6 +511,57 @@ export default function ShowsPage() {
       setError("Failed to unwatch that episode. Try again.");
     }
   };
+
+  // ─────────────────────────────────────────────────────────────
+// Helper: render one “History” card (grayed out, ✓ already watched)
+// ─────────────────────────────────────────────────────────────
+const renderHistoryCard = (epi: EpisodeInfo) => {
+  const epiKey = `hist-${epi.showId}-${epi.season}-${epi.episode}`;
+  return (
+    <div
+      key={epiKey}
+      style={{
+        ...styles.epiCard,
+        backgroundColor: "#2a2a2a", // lighter gray
+      }}
+      onClick={() => setModalEpisode(epi)}
+    >
+      {epi.poster_path ? (
+        <img
+          src={`${POSTER_BASE_URL}${epi.poster_path}`}
+          alt={epi.showName}
+          style={styles.epiPoster}
+        />
+      ) : (
+        <div style={styles.noImage}>No Image</div>
+      )}
+
+      <div style={styles.epiInfo}>
+        <span style={{ ...styles.showName, color: "#bbb" }}>
+          {epi.showName}
+        </span>
+        <span style={{ ...styles.epiLabel, color: "#aaa" }}>
+          {epi.label}
+        </span>
+        {epi.episodeTitle && (
+          <span style={{ ...styles.epiTitle, color: "#ccc" }}>
+            {epi.episodeTitle}
+          </span>
+        )}
+      </div>
+
+      {/* ✓ “Already Watched” (always checked) */}
+      <button
+        style={{
+          ...styles.cardWatchedBadge,
+          backgroundColor: "#444", // slightly lighter than normal
+        }}
+      >
+        ✔️
+      </button>
+    </div>
+  );
+};
 
   // ─────────────────────────────────────────────────────────────
   // Helper: render the card for one episode in the scroll list
@@ -518,7 +639,17 @@ export default function ShowsPage() {
   };
 
   return (
-    <div className="scrollable"  style={{...styles.container, paddingBottom: "9rem"}}>
+    <div
+      className="scrollable"
+      style={{ ...styles.container, paddingBottom: "9rem" }}
+      onScroll={(e) => {
+        const target = e.target as HTMLElement;
+        // When user scrolls within 50px of top, load 5 more history items:
+        if (target.scrollTop < 50 && historyCount < watchedHistory.length) {
+          setHistoryCount((prev) => prev + 5);
+        }
+      }}
+    >
       {/* Tab Buttons */}
       <div style={styles.tabContainer}>
         <button
@@ -544,39 +675,46 @@ export default function ShowsPage() {
       {/* Error Banner */}
       {error && <p style={styles.error}>{error}</p>}
 
-      {/* ─────────── “Watch List” Tab ─────────── */}
-      {activeTab === 0 && (
-        <>
-          {watchNextList.length > 0 && (
-            <div style={styles.section}>
-              <div style={styles.sectionHeader}>WATCH NEXT</div>
-              {watchNextList.map((epi) => renderEpisodeCard(epi))}
-            </div>
+      {/* ─────────── “Watched History” Section (new) ─────────── */}
+      {activeTab === 0 && watchedHistory.length > 0 && (
+        <div style={{ marginBottom: "1.5rem" }}>
+          <div style={styles.sectionHeader}>Watched History</div>
+          {watchedHistory.slice(0, historyCount).map((epi) =>
+            renderHistoryCard(epi)
           )}
-
-          {watchedAWhileList.length > 0 && (
-            <div style={styles.section}>
-              <div style={styles.sectionHeader}>
-                HAVEN’T WATCHED FOR A WHILE
-              </div>
-              {watchedAWhileList.map((epi) => renderEpisodeCard(epi))}
-            </div>
-          )}
-
-          {notStartedList.length > 0 && (
-            <div style={styles.section}>
-              <div style={styles.sectionHeader}>HAVEN’T STARTED</div>
-              {notStartedList.map((epi) => renderEpisodeCard(epi))}
-            </div>
-          )}
-
-          {watchNextList.length === 0 &&
-            watchedAWhileList.length === 0 &&
-            notStartedList.length === 0 && (
-              <p style={styles.emptyText}>Your watch list is empty.</p>
-            )}
-        </>
+        </div>
       )}
+
+      {/* ─────────── “Watch Next” Section ─────────── */}
+      {activeTab === 0 && watchNextList.length > 0 && (
+        <div style={styles.section}>
+          <div style={styles.sectionHeader}>WATCH NEXT</div>
+          {watchNextList.map((epi) => renderEpisodeCard(epi))}
+        </div>
+      )}
+
+      {/* ─────────── “Haven’t Watched For A While” Section ─────────── */}
+      {activeTab === 0 && watchedAWhileList.length > 0 && (
+        <div style={styles.section}>
+          <div style={styles.sectionHeader}>HAVEN’T WATCHED FOR A WHILE</div>
+          {watchedAWhileList.map((epi) => renderEpisodeCard(epi))}
+        </div>
+      )}
+
+      {/* ─────────── “Haven’t Started” Section ─────────── */}
+      {activeTab === 0 && notStartedList.length > 0 && (
+        <div style={styles.section}>
+          <div style={styles.sectionHeader}>HAVEN’T STARTED</div>
+          {notStartedList.map((epi) => renderEpisodeCard(epi))}
+        </div>
+      )}
+
+      {activeTab === 0 &&
+        watchNextList.length === 0 &&
+        watchedAWhileList.length === 0 &&
+        notStartedList.length === 0 && (
+          <p style={styles.emptyText}>Your watch list is empty.</p>
+        )}
 
       {/* ─────────── “Upcoming” Tab ─────────── */}
       {activeTab === 1 && (
