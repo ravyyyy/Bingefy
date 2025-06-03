@@ -1095,13 +1095,15 @@ const styles: { [key: string]: React.CSSProperties } = {
 
   // The pill-shaped background (dark gray) with white text, centered:
   sectionBadgeText: {
-    backgroundColor: "#2a2a2a",  // dark gray
-    color: "#fff",
+    backgroundColor: "#444444",  // dark gray
+    color: "#ffffff",
     fontSize: "0.75rem",
     fontWeight: "bold",
     padding: "4px 12px",        
     borderRadius: "999px",       // fully rounded pill shape
     whiteSpace: "nowrap",        // prevent wrapping
+    border: "1px solid #666666",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.5)",
   },
   epiCard: {
     display: "flex",
