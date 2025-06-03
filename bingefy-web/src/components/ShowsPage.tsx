@@ -1,6 +1,6 @@
 // src/components/ShowsPage.tsx
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
@@ -139,6 +139,7 @@ export default function ShowsPage() {
   const [watchedHistory, setWatchedHistory] = useState<EpisodeInfo[]>([]);
   const [historyCount, setHistoryCount] = useState(5);
   const [showHistory, setShowHistory] = useState(false);
+  const lastScrollTop = useRef(0);
 
   // One list for the “Upcoming” tab
   const [upcomingList, setUpcomingList] = useState<EpisodeInfo[]>([]);
@@ -645,13 +646,16 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
       style={{ ...styles.container, paddingBottom: "9rem" }}
       onScroll={(e) => {
         const target = e.target as HTMLElement;
-        // When user scrolls within 50px of top, load 5 more history items:
-        if (target.scrollTop < 50) {
-          setShowHistory(true);
-          if (historyCount < watchedHistory.length) {
-            setHistoryCount((prev) => prev + 5);
-          }
-        }
+        const curr = target.scrollTop;
+         // if we’re scrolling up and have come within 50px of the top, reveal history
+    if (curr < 50 && lastScrollTop.current > curr) {
+      setShowHistory(true);
+    }
+    lastScrollTop.current = curr;
+    // if we’re already showing history, load 5 more whenever we’re within 50px of the top
+    if (showHistory && curr < 50 && historyCount < watchedHistory.length) {
+      setHistoryCount((prev) => prev + 5);
+    }
       }}
     >
       {/* Tab Buttons */}
