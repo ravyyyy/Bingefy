@@ -642,22 +642,30 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
 
   return (
     <div
-      className="scrollable"
-      style={{ ...styles.container, paddingBottom: "9rem" }}
-      onScroll={(e) => {
-        const target = e.target as HTMLElement;
-        const curr = target.scrollTop;
-         // if we’re scrolling up and have come within 50px of the top, reveal history
-    if (curr < 50 && lastScrollTop.current > curr) {
+  className="scrollable"
+  style={{ ...styles.container, paddingBottom: "9rem" }}
+  onScroll={(e) => {
+    const target = e.target as HTMLElement;
+    const curr = target.scrollTop;
+
+    // 1) if we’re scrolling up into the top‐50px for the first time, reveal history
+    if (curr < 50 && lastScrollTop.current > curr && !showHistory) {
       setShowHistory(true);
     }
-    lastScrollTop.current = curr;
-    // if we’re already showing history, load 5 more whenever we’re within 50px of the top
-    if (showHistory && curr < 50 && historyCount < watchedHistory.length) {
+
+    // 2) once showHistory is true, only load 5 more when we cross from >50px down to <50px
+    if (
+      showHistory &&
+      lastScrollTop.current > 50 &&
+      curr < 50 &&
+      historyCount < watchedHistory.length
+    ) {
       setHistoryCount((prev) => prev + 5);
     }
-      }}
-    >
+
+    lastScrollTop.current = curr;
+  }}
+>
       {/* Tab Buttons */}
       <div style={styles.tabContainer}>
         <button
