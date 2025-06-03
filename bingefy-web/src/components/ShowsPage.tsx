@@ -1044,11 +1044,15 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
                       }}
                       style={
                         isAlready
-                          ? styles.cardWatchedBadge
+                          ? {
+                            ...styles.cardWatchBtn,
+                            backgroundColor: "#28a745",
+                            color: "#ffffff",
+                          }
                           : styles.cardWatchBtn
                       }
                     >
-                      ✔️
+                      ✓
                     </button>
                   );
                 })()}
