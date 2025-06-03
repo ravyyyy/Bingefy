@@ -14,14 +14,7 @@ body {
 }
 
 html, body {
-  overflow-y: scroll;
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-html::-webkit-scrollbar,
-body::-webkit-scrollbar {
-  display: none;
+  overflow-y: hidden;
 }
 
 /* Titles */
@@ -135,4 +128,17 @@ button {
   100% {
     transform: translateX(-100%);
   }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Scrollable container with hidden scrollbar
+   ───────────────────────────────────────────────────────────────────────────── */
+.scrollable {
+  height: 100vh;               /* fill the viewport height */
+  overflow-y: auto;            /* allow vertical scrolling */
+  -ms-overflow-style: none;    /* IE/Edge: hide scrollbar */
+  scrollbar-width: none;       /* Firefox: hide scrollbar */
+}
+.scrollable::-webkit-scrollbar {
+  display: none;               /* Chrome/Safari/Opera: hide scrollbar */
 }

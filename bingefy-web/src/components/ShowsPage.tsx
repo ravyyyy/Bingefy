@@ -518,7 +518,7 @@ export default function ShowsPage() {
   };
 
   return (
-    <div style={styles.container}>
+    <div className="scrollable"  style={styles.container}>
       {/* Tab Buttons */}
       <div style={styles.tabContainer}>
         <button
@@ -858,6 +858,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     padding: "1rem",
     color: "#fff",
     position: "relative",
+    /* Note: we no longer need overflow here, because scrolling is driven by .scrollable */
   },
   tabContainer: {
     display: "flex",

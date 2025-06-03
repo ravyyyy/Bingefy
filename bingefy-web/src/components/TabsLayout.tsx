@@ -101,6 +101,6 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
   contentContainer: {
     flex: 1,
-    overflow: "auto",
+    overflow: "hidden",
   },
 };
