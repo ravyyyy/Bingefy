@@ -244,7 +244,6 @@ function OnboardingLayout() {
       <div style={onboardStyles.overlay} />
       <div style={onboardStyles.centerContainer}>
         <div style={onboardStyles.card}>
-          <h2 style={onboardStyles.heading}>Tell us about yourself</h2>
           <Outlet />
         </div>
       </div>
