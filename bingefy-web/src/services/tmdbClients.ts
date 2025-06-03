@@ -196,6 +196,8 @@ export interface EpisodeDetail {
   episode_number: number;
   season_number: number;
   still_path: string | null;
+  vote_average: number;
+  vote_count: number;
 }
 
 export async function getEpisodeDetails(
@@ -203,14 +205,16 @@ export async function getEpisodeDetails(
   seasonNum: number,
   episodeNum: number
 ): Promise<EpisodeDetail> {
-  const url = new URL(`${BASE_URL}/tv/${showId}/season/${seasonNum}/episode/${episodeNum}`);
+  const url = new URL(
+    `${BASE_URL}/tv/${showId}/season/${seasonNum}/episode/${episodeNum}`
+  );
   url.searchParams.set("api_key", API_KEY);
   url.searchParams.set("language", "en-US");
 
   const response = await fetch(url.toString());
   if (!response.ok) {
     throw new Error(
-      `TMDB Error (get episode details for show ${showId}, S${seasonNum} E${episodeNum}): ${response.status}`
+      `TMDB Error (getEpisodeDetails for show ${showId} S${seasonNum}E${episodeNum}): ${response.status}`
     );
   }
   return (await response.json()) as EpisodeDetail;
