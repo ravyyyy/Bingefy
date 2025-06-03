@@ -7,26 +7,30 @@ import { db } from "../firebase";
 import {
   getLatestTV,
   getTVShowDetails,
+  getEpisodeDetails,      // ← newly added
   type TVShow,
+  type EpisodeDetail,
 } from "../services/tmdbClients";
 
 const POSTER_BASE_URL = "https://image.tmdb.org/t/p/w200";
 
-// Interface for the shape of a watched‐entry stored in Firestore
+// Shape of a “watched” entry in Firestore
 interface WatchedEntry {
   season: number;
   episode: number;
   watchedAt: string; // ISO timestamp
 }
 
-// Local interface for each “episode info” to display
+// Local interface for each episode to display
 interface EpisodeInfo {
   showId: number;
   showName: string;
   poster_path: string | null;
   season: number;
   episode: number;
-  label: string;
+  label: string;           // e.g. “S2 E3” or “Last seen S2 E3”
+  episodeTitle: string;    // Filled in from getEpisodeDetails.name
+  episodeOverview: string; // Filled in from getEpisodeDetails.overview
 }
 
 export default function ShowsPage() {
@@ -35,7 +39,7 @@ export default function ShowsPage() {
   // 0 = Watch List, 1 = Upcoming
   const [activeTab, setActiveTab] = useState<0 | 1>(0);
 
-  // IDs of shows the user selected in onboarding (step 2)
+  // IDs of shows chosen in onboarding (step 2)
   const [onboardedIds, setOnboardedIds] = useState<number[]>([]);
 
   // Map: showId → array of WatchedEntry
@@ -43,7 +47,7 @@ export default function ShowsPage() {
     Record<number, WatchedEntry[]>
   >({});
 
-  // Three lists for the Watch List tab:
+  // Three lists for the Watch List tab
   const [watchNextList, setWatchNextList] = useState<EpisodeInfo[]>([]);
   const [watchedAWhileList, setWatchedAWhileList] = useState<EpisodeInfo[]>([]);
   const [notStartedList, setNotStartedList] = useState<EpisodeInfo[]>([]);
@@ -104,16 +108,16 @@ export default function ShowsPage() {
           now.getTime() - 30 * 24 * 60 * 60 * 1000
         ).toISOString();
 
+        // Temporary arrays of EpisodeInfo (without episodeTitle/overview yet)
         const nextArr: EpisodeInfo[] = [];
         const aWhileArr: EpisodeInfo[] = [];
         const notStartedArr: EpisodeInfo[] = [];
 
-        // Loop over each show the user chose
         for (const showId of onboardedIds) {
           const watchedEntries = episodesWatchedMap[showId] || [];
 
           if (watchedEntries.length === 0) {
-            // Never watched: put S1 E1 in “Haven’t Started”
+            // Never watched → “Haven’t Started”, Season 1 Episode 1
             notStartedArr.push({
               showId,
               showName: "",
@@ -121,11 +125,13 @@ export default function ShowsPage() {
               season: 1,
               episode: 1,
               label: "S1 E1",
+              episodeTitle: "",
+              episodeOverview: "",
             });
             continue;
           }
 
-          // Otherwise, sort that show’s watched entries by watchedAt desc
+          // Sort watched entries by watchedAt descending
           watchedEntries.sort(
             (a, b) =>
               new Date(b.watchedAt).getTime() - new Date(a.watchedAt).getTime()
@@ -136,7 +142,7 @@ export default function ShowsPage() {
           const lastEpisode = mostRecent.episode;
 
           if (lastWatchedDate > thirtyDaysAgo) {
-            // Watched within 30 days → “Watch Next” for next episode
+            // Within 30 days → “Watch Next”
             nextArr.push({
               showId,
               showName: "",
@@ -144,9 +150,11 @@ export default function ShowsPage() {
               season: lastSeason,
               episode: lastEpisode + 1,
               label: `S${lastSeason} E${lastEpisode + 1}`,
+              episodeTitle: "",
+              episodeOverview: "",
             });
           } else {
-            // Watched before 30 days → “Haven’t Watched For A While”
+            // Outside 30 days → “Haven’t Watched For A While”
             aWhileArr.push({
               showId,
               showName: "",
@@ -154,18 +162,20 @@ export default function ShowsPage() {
               season: lastSeason,
               episode: lastEpisode + 1,
               label: `Last seen S${lastSeason} E${lastEpisode}`,
+              episodeTitle: "",
+              episodeOverview: "",
             });
           }
         }
 
-        // Combine all EpisodeInfo entries so we can fetch show details in one batch
+        // Combine all EpisodeInfo entries to batch‐fetch show + episode details
         const allEpisodes = [...nextArr, ...aWhileArr, ...notStartedArr];
         const uniqueShowIds = Array.from(
           new Set(allEpisodes.map((e) => e.showId))
         );
         const detailsMap: Record<number, TVShow> = {};
 
-        // Fetch full details (to fill name & poster)
+        // 2a) Fetch show details (to fill showName + poster_path)
         await Promise.all(
           uniqueShowIds.map(async (sid) => {
             const det = await getTVShowDetails(sid);
@@ -173,14 +183,33 @@ export default function ShowsPage() {
           })
         );
 
-        // Fill in showName & poster_path on each EpisodeInfo
-        allEpisodes.forEach((epi) => {
-          const det = detailsMap[epi.showId];
-          epi.showName = det.name;
-          epi.poster_path = det.poster_path;
-        });
+        // 2b) For each EpisodeInfo, fetch its episode details (to fill title + overview)
+        await Promise.all(
+          allEpisodes.map(async (epi) => {
+            const det = detailsMap[epi.showId];
+            epi.showName = det.name;
+            epi.poster_path = det.poster_path;
 
-        // Now split back into final arrays
+            // Now fetch the actual episode’s name + overview
+            // If the requested season/episode does not exist (e.g. user watched last season), the call may 404—catch that.
+            try {
+              const epDet: EpisodeDetail = await getEpisodeDetails(
+                epi.showId,
+                epi.season,
+                epi.episode
+              );
+              epi.episodeTitle = epDet.name;
+              epi.episodeOverview = epDet.overview;
+            } catch {
+              // If TMDB returns 404 (e.g. user tried to watch beyond last existing ep),
+              // we’ll just leave title/overview empty.
+              epi.episodeTitle = "";
+              epi.episodeOverview = "";
+            }
+          })
+        );
+
+        // Split back into the three final lists
         const finalizedNext = allEpisodes.filter((epi) =>
           nextArr.some(
             (n) =>
@@ -230,7 +259,6 @@ export default function ShowsPage() {
         const latestResp = await getLatestTV(1);
         const today = new Date().toISOString().split("T")[0];
 
-        // Filter to user’s shows whose first_air_date is in the future
         const filtered: TVShow[] = latestResp.results.filter(
           (show) =>
             onboardedIds.includes(show.id) &&
@@ -243,6 +271,20 @@ export default function ShowsPage() {
             const det = await getTVShowDetails(show.id);
             const ne = det.next_episode_to_air;
             if (ne) {
+              // Fetch episode details for that upcoming episode
+              let epTitle = "";
+              let epOverview = "";
+              try {
+                const epDet: EpisodeDetail = await getEpisodeDetails(
+                  show.id,
+                  ne.season_number,
+                  ne.episode_number
+                );
+                epTitle = epDet.name;
+                epOverview = epDet.overview;
+              } catch {
+                // If it 404s, just leave blank
+              }
               upcomingEpisodes.push({
                 showId: show.id,
                 showName: show.name,
@@ -250,6 +292,8 @@ export default function ShowsPage() {
                 season: ne.season_number,
                 episode: ne.episode_number,
                 label: `S${ne.season_number} E${ne.episode_number}`,
+                episodeTitle: epTitle,
+                episodeOverview: epOverview,
               });
             }
           })
@@ -263,9 +307,8 @@ export default function ShowsPage() {
   }, [onboardedIds]);
 
   /**
-   * When the user clicks “Mark as Watched” on an EpisodeInfo:
-   *  1) Append { season, episode, watchedAt: now } to Firestore under
-   *     `episodesWatched.<showId>`.
+   * When user clicks “Mark as Watched” on an EpisodeInfo:
+   *  1) Append a new WatchedEntry to Firestore under episodesWatched.<showId>
    *  2) Update local state so the UI re‐renders immediately.
    */
   const markAsWatched = async (epi: EpisodeInfo) => {
@@ -295,7 +338,7 @@ export default function ShowsPage() {
     }
   };
 
-  // Helper: render a single episode card
+  // Helper to render a single episode card, including title, overview, and “Mark as Watched”
   const renderEpisodeCard = (epi: EpisodeInfo, showMarkButton: boolean) => (
     <div
       key={`${epi.showId}-${epi.season}-${epi.episode}`}
@@ -313,12 +356,15 @@ export default function ShowsPage() {
       <div style={styles.epiInfo}>
         <span style={styles.showName}>{epi.showName}</span>
         <span style={styles.epiLabel}>{epi.label}</span>
+        {epi.episodeTitle && (
+          <span style={styles.epiTitle}>{epi.episodeTitle}</span>
+        )}
+        {epi.episodeOverview && (
+          <p style={styles.epiOverview}>{epi.episodeOverview}</p>
+        )}
       </div>
       {showMarkButton && (
-        <button
-          onClick={() => markAsWatched(epi)}
-          style={styles.markButton}
-        >
+        <button onClick={() => markAsWatched(epi)} style={styles.markButton}>
           Mark as Watched
         </button>
       )}
@@ -436,7 +482,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
   epiCard: {
     display: "flex",
-    alignItems: "center",
+    alignItems: "flex-start",
     backgroundColor: "#181818",
     borderRadius: "4px",
     padding: "0.75rem",
@@ -474,9 +520,21 @@ const styles: { [key: string]: React.CSSProperties } = {
   epiLabel: {
     fontSize: "0.85rem",
     color: "#ccc",
+    marginBottom: "0.5rem",
+  },
+  epiTitle: {
+    fontSize: "0.95rem",
+    marginBottom: "0.25rem",
+    color: "#fff",
+  },
+  epiOverview: {
+    fontSize: "0.85rem",
+    color: "#ddd",
+    marginBottom: "0.5rem",
   },
   markButton: {
     marginLeft: "auto",
+    marginTop: "0.5rem",
     backgroundColor: "#e50914",
     color: "#fff",
     border: "none",
