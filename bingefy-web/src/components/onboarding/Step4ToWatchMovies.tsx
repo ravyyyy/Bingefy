@@ -80,32 +80,21 @@ export function Step4ToWatchMovies() {
     }
     try {
       const userDocRef = doc(db, "users", user.uid);
-      // Write the “moviesToWatch” array and mark onboarded = true
       await updateDoc(userDocRef, {
         moviesToWatch: Array.from(selected),
         onboarded: true,
       });
-      // Redirect to “/” so OnboardingGate sees onboarded=true
       navigate("/", { replace: true });
     } catch {
       setError("Could not save your “to watch” list. Try again.");
     }
   };
 
-  const handleLater = async () => {
-    if (!user) return;
-    const userDocRef = doc(db, "users", user.uid);
-    await updateDoc(userDocRef, {
-      moviesToWatch: [],
-      onboarded: true,
-    });
-    navigate("/", { replace: true });
-  };
-
-  function useHorizontalDragScroll(ref: React.RefObject<HTMLDivElement>) {
+  function useHorizontalDragScroll(ref: React.RefObject<HTMLDivElement | null>) {
     useEffect(() => {
       const element = ref.current;
       if (!element) return;
+      const el: HTMLDivElement = element;
 
       let isDown = false;
       let startX = 0;
@@ -114,39 +103,39 @@ export function Step4ToWatchMovies() {
       function onMouseDown(e: MouseEvent) {
         isDown = true;
         didDragRef.current = false;
-        startX = e.pageX - element.offsetLeft;
-        scrollLeft = element.scrollLeft;
-        element.classList.add("dragging");
+        startX = e.pageX - el.offsetLeft;
+        scrollLeft = el.scrollLeft;
+        el.classList.add("dragging");
       }
       function onMouseLeave() {
         isDown = false;
-        element.classList.remove("dragging");
+        el.classList.remove("dragging");
       }
       function onMouseUp(e: MouseEvent) {
-        if (isDown && Math.abs(e.pageX - (startX + element.offsetLeft)) > 5) {
+        if (isDown && Math.abs(e.pageX - (startX + el.offsetLeft)) > 5) {
           didDragRef.current = true;
         }
         isDown = false;
-        element.classList.remove("dragging");
+        el.classList.remove("dragging");
       }
       function onMouseMove(e: MouseEvent) {
         if (!isDown) return;
         e.preventDefault();
-        const x = e.pageX - element.offsetLeft;
+        const x = e.pageX - el.offsetLeft;
         const walk = (x - startX) * 1;
-        element.scrollLeft = scrollLeft - walk;
+        el.scrollLeft = scrollLeft - walk;
       }
 
-      element.addEventListener("mousedown", onMouseDown);
-      element.addEventListener("mouseleave", onMouseLeave);
-      element.addEventListener("mouseup", onMouseUp);
-      element.addEventListener("mousemove", onMouseMove);
+      el.addEventListener("mousedown", onMouseDown);
+      el.addEventListener("mouseleave", onMouseLeave);
+      el.addEventListener("mouseup", onMouseUp);
+      el.addEventListener("mousemove", onMouseMove);
 
       return () => {
-        element.removeEventListener("mousedown", onMouseDown);
-        element.removeEventListener("mouseleave", onMouseLeave);
-        element.removeEventListener("mouseup", onMouseUp);
-        element.removeEventListener("mousemove", onMouseMove);
+        el.removeEventListener("mousedown", onMouseDown);
+        el.removeEventListener("mouseleave", onMouseLeave);
+        el.removeEventListener("mouseup", onMouseUp);
+        el.removeEventListener("mousemove", onMouseMove);
       };
     }, [ref]);
   }
@@ -157,20 +146,21 @@ export function Step4ToWatchMovies() {
 
   return (
     <div style={styles.container}>
-      {/* ─────────── TOP BUTTONS ─────────── */}
-      <div style={styles.topButtonsContainer}>
-        <button onClick={handleLater} style={styles.laterButton}>
-          Later
-        </button>
-        <button onClick={handleNext} style={styles.nextButton}>
+      {/* ─────────── INSTRUCTIONS ─────────── */}
+      <p style={styles.instructions}>
+        Choose the movies you want to watch.
+      </p>
+
+      {/* ─────────── TOP “Next” BUTTON ─────────── */}
+      <div style={styles.topButtonContainer}>
+        <button
+          onClick={handleNext}
+          style={styles.nextButton}
+        >
           Next
         </button>
       </div>
 
-      {/* ─────────── INSTRUCTIONS & ERROR ─────────── */}
-      <p style={styles.instructions}>
-        Choose the movies you want to watch (or click “Later” to finish).
-      </p>
       {error && <p style={styles.error}>{error}</p>}
 
       {/* ─────────── MOVIES TO WATCH – ROW 1 ─────────── */}
@@ -214,16 +204,6 @@ export function Step4ToWatchMovies() {
           />
         ))}
       </div>
-
-      {/* ─────────── BOTTOM BUTTONS (OPTIONAL) ─────────── */}
-      <div style={styles.bottomButtonsContainer}>
-        <button onClick={handleLater} style={styles.laterButton}>
-          Later
-        </button>
-        <button onClick={handleNext} style={styles.nextButton}>
-          Next
-        </button>
-      </div>
     </div>
   );
 }
@@ -233,22 +213,15 @@ const styles: { [key: string]: React.CSSProperties } = {
     padding: "1rem",
     color: "#fff",
   },
-  topButtonsContainer: {
-    display: "flex",
-    justifyContent: "center",
-    gap: "1rem",
-    marginBottom: "1rem",
-  },
-  bottomButtonsContainer: {
-    display: "flex",
-    justifyContent: "center",
-    gap: "1rem",
-    marginTop: "2rem",
-  },
   instructions: {
     fontSize: "1rem",
     marginBottom: "1rem",
     textAlign: "center",
+  },
+  topButtonContainer: {
+    display: "flex",
+    justifyContent: "center",
+    marginBottom: "1rem",
   },
   horizontalRow: {
     display: "flex",
@@ -265,14 +238,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     backgroundPosition: "center",
     borderRadius: "4px",
     transition: "opacity 0.2s",
-  },
-  laterButton: {
-    padding: "0.5rem 1rem",
-    backgroundColor: "#555",
-    color: "#fff",
-    border: "none",
-    borderRadius: "4px",
-    cursor: "pointer",
   },
   nextButton: {
     padding: "0.5rem 1rem",
