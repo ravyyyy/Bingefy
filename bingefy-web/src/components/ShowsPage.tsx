@@ -523,15 +523,14 @@ useLayoutEffect(() => {
   if (
     historyContainerRef.current !== null &&
     scrollRef.current !== null &&
-    prevHistoryHeightRef.current > 0
+    prevHistoryHeightRef.current !== null &&
+    historyCount <= 10
   ) {
     const newHeight = historyContainerRef.current.scrollHeight;
     const delta = newHeight - prevHistoryHeightRef.current;
     scrollRef.current.scrollTop += delta;
-    prevHistoryHeightRef.current = 0;
   }
 }, [historyCount]);
-
 
   /**
    * When user clicks “✔️” to mark this episode as watched:
@@ -766,15 +765,25 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
          paddingBottom: "9rem", // unchanged from before
        }}
        onScroll={(e) => {
-         const target = e.target as HTMLElement;
-         const curr = target.scrollTop;
-         if (curr < 50 && lastScrollTop.current > curr) {
-           if (historyCount < watchedHistory.length) {
-             setHistoryCount((prev) => prev + 5);
-           }
-         }
-         lastScrollTop.current = curr;
-       }}
+  const target = e.target as HTMLElement;
+  const curr = target.scrollTop;
+
+  // If we scrolled up into the top 50px and still have more history to show…
+  if (curr < 50 && lastScrollTop.current > curr) {
+    if (historyCount < watchedHistory.length) {
+      // 1) Record how tall the “history” container is *right now*:
+      if (historyContainerRef.current) {
+        prevHistoryHeightRef.current = historyContainerRef.current.scrollHeight;
+      }
+
+      // 2) Now bump the count by 5. After React re-renders,
+      //    useLayoutEffect (below) will shift the scroll by the right delta.
+      setHistoryCount((prev) => prev + 5);
+    }
+  }
+
+  lastScrollTop.current = curr;
+}}
      >
        {/* ─ Tab Buttons for Watch List/Upcoming are now removed here because we moved them up */}
        {/* ─ Error Banner ─ */}
