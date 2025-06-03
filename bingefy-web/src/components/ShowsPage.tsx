@@ -399,13 +399,11 @@ export default function ShowsPage() {
       style={styles.epiCard}
       onClick={() => setModalEpisode(epi)} // open modal on card click
     >
-      {epi.still_path ? (
-        <img
-          src={`${POSTER_BASE_URL}${epi.still_path}`}
-          alt={epi.showName}
-          style={styles.epiPoster}
-        />
-      ) : epi.poster_path ? (
+      {/*
+        Use the show’s poster here (epi.poster_path), not the episode’s still.
+        If poster_path is missing, fall back to a “No Image” placeholder.
+      */}
+      {epi.poster_path ? (
         <img
           src={`${POSTER_BASE_URL}${epi.poster_path}`}
           alt={epi.showName}
@@ -423,9 +421,7 @@ export default function ShowsPage() {
         )}
         {epi.episodeOverview && (
           <p style={styles.epiOverview}>
-            {epi.episodeOverview.length > 60
-              ? epi.episodeOverview.slice(0, 60) + "…"
-              : epi.episodeOverview}
+            {epi.episodeOverview /* full description, no truncation */}
           </p>
         )}
       </div>
@@ -461,6 +457,7 @@ export default function ShowsPage() {
                 groupForThis = notStartedList;
               }
             } else {
+              // “Upcoming” tab
               groupForThis = upcomingList;
             }
 
@@ -495,7 +492,7 @@ export default function ShowsPage() {
               } else {
                 setModalEpisode(null);
               }
-            }, 400);
+            }, 400); // 400ms for the white→green transition
           }
         }}
         style={{
@@ -516,6 +513,7 @@ export default function ShowsPage() {
     </div>
   );
 };
+
 
   return (
     <div style={styles.container}>
