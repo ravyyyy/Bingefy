@@ -43,6 +43,57 @@ interface EpisodeInfo {
   vote_average: number;     // from EpisodeDetail.vote_average (0–10 scale)
 }
 
+const topTabBarHeight = 64; // must match your main menu height
+ const topNavStyles = {
+   container: {
+     position: "fixed" as const,
+     top: 0,
+     left: 0,
+     width: "100%",
+     height: `${topTabBarHeight}px`,
+     backgroundColor: "#111",
+     borderBottom: "1px solid #333",
+     display: "flex",
+     justifyContent: "space-around",
+     alignItems: "center",
+     zIndex: 10,
+   },
+   tab: {
+     display: "flex",
+     flexDirection: "column" as const,
+     alignItems: "center",
+     justifyContent: "center",
+     color: "#888",
+     backgroundColor: "transparent",
+     border: "none",
+     textDecoration: "none",
+     fontSize: "14px",
+     gap: "4px",
+     width: "50%", // two tabs = 50% each
+     height: "100%",
+     transition: "color 0.2s",
+   },
+   activeTab: {
+     display: "flex",
+     flexDirection: "column" as const,
+     alignItems: "center",
+     justifyContent: "center",
+     color: "#fff",
+     backgroundColor: "transparent",
+     border: "none",
+     textDecoration: "none",
+     fontSize: "14px",
+     gap: "4px",
+     width: "50%",
+     height: "100%",
+     borderBottom: "3px solid #e50914",
+     transition: "color 0.2s, border-bottom 0.2s",
+   },
+  label: {
+    fontSize: "14px",
+    fontWeight: 500,
+  },};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper #1: Remove any duplicate (season,episode) and keep only the one
 //            with the latest watchedAt timestamp. (Prevents “double counting.”)
@@ -678,52 +729,55 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
   };
 
   return (
-    <div
-    ref={scrollRef}
-  className="scrollable"
-  style={{ ...styles.container, paddingBottom: "9rem" }}
-  onScroll={(e) => {
-    const target = e.target as HTMLElement;
-    const curr = target.scrollTop;
+       <>
+     {/* ───── Top “Watch List / Upcoming” bar ───── */}
+     <nav style={topNavStyles.container}>
+       <button
+         onClick={() => setActiveTab(0)}
+         style={
+           activeTab === 0
+             ? topNavStyles.activeTab
+             : topNavStyles.tab
+         }
+       >
+         {/* (optional: add an icon to match main menu style) */}
+         <span style={topNavStyles.label}>Watch List</span>
+       </button>
+       <button
+         onClick={() => setActiveTab(1)}
+         style={
+           activeTab === 1
+             ? topNavStyles.activeTab
+             : topNavStyles.tab
+         }
+       >
+         <span style={topNavStyles.label}>Upcoming</span>
+       </button>
+     </nav>
 
-    // when they scroll up into the top 50px (and we haven’t already bumped historyCount),
-    // load 5 more:
-    if (curr < 50 && lastScrollTop.current > curr) {
-      if (historyCount < watchedHistory.length) {
-        if (historyContainerRef.current) {
-          prevHistoryHeightRef.current = historyContainerRef.current.scrollHeight;
-        }
-        setHistoryCount((prev) => prev + 5);
-      }
-    }
-    lastScrollTop.current = curr;
-  }}
->
-      {/* Tab Buttons */}
-      <div style={styles.tabContainer}>
-  <button
-    onClick={() => setActiveTab(0)}
-    style={{
-      ...styles.tabButton,
-      ...(activeTab === 0 ? styles.tabButtonActive : styles.tabInactive),
-    }}
-  >
-    Watch List
-  </button>
-  <button
-    onClick={() => setActiveTab(1)}
-    style={{
-      ...styles.tabButton,
-      ...(activeTab === 1 ? styles.tabButtonActive : styles.tabInactive),
-    }}
-  >
-    Upcoming
-  </button>
-</div>
-
-
-
-      {/* Error Banner */}
+     {/* ───── Content area ───── */}
+     {/* Add paddingTop so content starts below the fixed top nav */}
+     <div
+       ref={scrollRef}
+       className="scrollable"
+       style={{
+         ...styles.container,
+         paddingTop: `${topTabBarHeight}px`,
+         paddingBottom: "9rem", // unchanged from before
+       }}
+       onScroll={(e) => {
+         const target = e.target as HTMLElement;
+         const curr = target.scrollTop;
+         if (curr < 50 && lastScrollTop.current > curr) {
+           if (historyCount < watchedHistory.length) {
+             setHistoryCount((prev) => prev + 5);
+           }
+         }
+         lastScrollTop.current = curr;
+       }}
+     >
+       {/* ─ Tab Buttons for Watch List/Upcoming are now removed here because we moved them up */}
+       {/* ─ Error Banner ─ */}
       {error && <p style={styles.error}>{error}</p>}
 
       {/* ─────────── “Watched History” Section (new) ─────────── */}
@@ -1048,6 +1102,7 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
         </div>
       )}
     </div>
+    </>
   );
 }
 
