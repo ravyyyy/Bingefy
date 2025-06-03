@@ -650,14 +650,22 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
         )}
       </div>
 
-      {/* ✓ “Already Watched” (always checked) */}
+      {/* Always‐watched: show the same badge style used by renderEpisodeCard */}
       <button
+        onClick={(e) => {
+          // We do nothing on click (it’s already watched),
+          // but you can keep this here in case you ever want
+          // a “click to unwatch” behavior later.
+          e.stopPropagation();
+        }}
         style={{
-          ...styles.cardWatchedBadge,
-          backgroundColor: "#444", // slightly lighter than normal
+          // In `renderEpisodeCard`, whenever “isWatched” is true, we apply styles.cardWatchedBadge
+          ...styles.cardWatchBtn,
+          backgroundColor: "#28a745", // slightly lighter gray, same as EpisodeCard
+          color: "#fff"
         }}
       >
-        ✔️
+        ✓
       </button>
     </div>
   );
