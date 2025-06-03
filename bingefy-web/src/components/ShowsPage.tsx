@@ -42,7 +42,7 @@ interface EpisodeInfo {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helper: Attempt to fetch a sibling episode (same season only).
+// Helper: Attempt to fetch a sibling episode (same season).
 // Returns EpisodeDetail or null if TMDB returns 404 or episode < 1.
 // ─────────────────────────────────────────────────────────────────────────────
 async function fetchSiblingEpisode(
@@ -62,7 +62,7 @@ async function fetchSiblingEpisode(
   try {
     return await getEpisodeDetails(showId, targetSeason, targetEpisode);
   } catch {
-    // TMDB returned 404; no same‐season sibling
+    // TMDB returned 404; no same-season sibling
     return null;
   }
 }
@@ -378,7 +378,7 @@ export default function ShowsPage() {
   }, [onboardedIds]);
 
   /**
-   * When user clicks “✔️” (either on the card or in the modal), mark this episode as watched:
+   * When user clicks “✔️” to mark this episode as watched:
    *   1) Append a new WatchedEntry to Firestore: episodesWatched.<showId>
    *   2) Update local state so UI re‐renders immediately
    */
@@ -416,6 +416,36 @@ export default function ShowsPage() {
     } catch (err) {
       console.error(err);
       setError("Failed to mark episode as watched. Try again.");
+    }
+  };
+
+  /**
+   * When user clicks to “unwatch” (only after confirmation):
+   *   1) Remove that season/episode from Firestore array episodesWatched.<showId>
+   *   2) Update local state so UI re‐renders immediately
+   */
+  const unmarkAsWatched = async (epi: EpisodeInfo) => {
+    if (!user) return;
+    const userRef = doc(db, "users", user.uid);
+
+    // Filter out this (season, episode) pair
+    const existingArray = episodesWatchedMap[epi.showId] || [];
+    const updatedArray = existingArray.filter(
+      (we) => !(we.season === epi.season && we.episode === epi.episode)
+    );
+
+    try {
+      await updateDoc(userRef, {
+        [`episodesWatched.${epi.showId}`]: updatedArray,
+      });
+      setEpisodesWatchedMap((prev) => ({
+        ...prev,
+        [epi.showId]: updatedArray,
+      }));
+      // Do not close modal here; keep user on same episode if desired
+    } catch (err) {
+      console.error(err);
+      setError("Failed to unwatch that episode. Try again.");
     }
   };
 
@@ -489,15 +519,15 @@ export default function ShowsPage() {
                   return copy;
                 });
 
-                // 4) Close any open modal (no auto‐advance)
+                // 4) Close any open modal (no auto-advance)
                 setModalEpisode(null);
               }, 400); // 400ms for the white→green transition
             }
           }}
           style={{
-            // If already watched, show gray badge. Otherwise:
-            //   - if animating: green background + white check
-            //   - if not yet pressed: white circle + dark check
+            // If already watched → gray badge. Otherwise:
+            //   - if animating → green background + white check
+            //   - if not yet pressed → white circle + dark check
             ...(isWatched
               ? styles.cardWatchedBadge
               : {
@@ -591,7 +621,7 @@ export default function ShowsPage() {
           style={styles.modalOverlay}
           onClick={() => setModalEpisode(null)}
         >
-          {/* Left‐side arrow now lives as a sibling of modalContent */}
+          {/* ─────────── Left‐side arrow (sits outside the modalContent) ─────────── */}
           <button
             style={styles.modalArrowLeft}
             onClick={async (e) => {
@@ -627,11 +657,11 @@ export default function ShowsPage() {
             style={styles.modalContent}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* ─────────── Top-Left “Back to Show” Button ─────────── */}
+            {/* ─────────── Top‐Left “Back to Show” Button ─────────── */}
             <button
               style={styles.modalBackButton}
               onClick={() => {
-                // For now, go back to /shows. Later: `/shows/${modalEpisode.showId}`
+                // For now, go back to /shows. Later you can replace with `/shows/${modalEpisode.showId}`
                 window.location.href = "/shows";
               }}
             >
@@ -672,7 +702,7 @@ export default function ShowsPage() {
 
             {/* ─────────── Episode Info Section ─────────── */}
             <div style={styles.modalInfo}>
-              {/* Air Date / “Not watched” or watched date / Rating */}
+              {/* Air Date / “Not watched” or watched date / Rating / Check‐button */}
               <div style={styles.modalAirRatingRow}>
                 <p style={styles.modalAirDate}>
                   Air Date: {modalEpisode.air_date || "Unknown"}
@@ -689,12 +719,55 @@ export default function ShowsPage() {
                     ? `Watched on ${match.watchedAt.split("T")[0]}`
                     : "Not watched";
                   return (
-                    <>
-                      <p style={styles.notWatchedOrDate}>{watchedTag}</p>
-                      <p style={styles.modalRatingPercent}>
-                        {Math.round(modalEpisode.vote_average * 10)}%
-                      </p>
-                    </>
+                    <p style={styles.notWatchedOrDate}>{watchedTag}</p>
+                  );
+                })()}
+                <p style={styles.modalRatingPercent}>
+                  {Math.round(modalEpisode.vote_average * 10)}%
+                </p>
+
+                {(() => {
+                  const watchedEntries =
+                    episodesWatchedMap[modalEpisode.showId] || [];
+                  const isAlready =
+                    watchedEntries.some(
+                      (we) =>
+                        we.season === modalEpisode.season &&
+                        we.episode === modalEpisode.episode
+                    );
+                  // Always show the circular button, regardless of watched status
+                  return (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!isAlready) {
+                          // Not watched yet → mark as watched immediately
+                          markAsWatched(modalEpisode);
+                        } else {
+                          // Already watched → ask for confirmation to unwatch
+                          const confirmUnwatch = window.confirm(
+                            "This episode is already marked as watched. Do you want to unwatch it?"
+                          );
+                          if (confirmUnwatch) {
+                            unmarkAsWatched(modalEpisode);
+                          }
+                        }
+                      }}
+                      style={
+                        // If episode is watched → show gray badge style.
+                        // Otherwise → show white circle style.
+                        watchedEntries.some(
+                          (we) =>
+                            we.season === modalEpisode.season &&
+                            we.episode === modalEpisode.episode
+                        )
+                          ? styles.cardWatchedBadge
+                          : styles.cardWatchBtn
+                      }
+                    >
+                      { /* Show a checkmark in both cases */ }
+                      ✔️
+                    </button>
                   );
                 })()}
               </div>
@@ -708,32 +781,10 @@ export default function ShowsPage() {
                   </p>
                 </div>
               )}
-
-              {/* Circular “Mark as Watched” Button */}
-              {(() => {
-                const watchedEntries =
-                  episodesWatchedMap[modalEpisode.showId] || [];
-                const alreadyWatched = watchedEntries.some(
-                  (we) =>
-                    we.season === modalEpisode.season &&
-                    we.episode === modalEpisode.episode
-                );
-                if (!alreadyWatched) {
-                  return (
-                    <button
-                      style={styles.modalMarkAsWatchedBtn}
-                      onClick={() => markAsWatched(modalEpisode)}
-                    >
-                      ✔️
-                    </button>
-                  );
-                }
-                return null;
-              })()}
             </div>
           </div>
 
-          {/* Right‐side arrow now lives as a sibling of modalContent */}
+          {/* ─────────── Right‐side arrow (sits outside the modalContent) ─────────── */}
           <button
             style={styles.modalArrowRight}
             onClick={async (e) => {
@@ -868,7 +919,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 
   // ────────────────────────────────────────────────────────────────────────────
-  // In-card watch button styles:
+  // In‐card watch button styles (used both in the list and in the modal):
   // ────────────────────────────────────────────────────────────────────────────
   cardWatchBtn: {
     position: "absolute",
@@ -897,7 +948,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     color: "#fff",
     fontSize: "1rem",
     lineHeight: 1,
-    cursor: "default",
+    cursor: "pointer",
   },
 
   // ────────────────────────────────────────────────────────────────────────────
@@ -927,7 +978,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 
   // ────────────────────────────────────────────────────────────────────────────
-  // Back-to -Show Button (top-left)
+  // Back-to-Show Button (top-left)
   // ────────────────────────────────────────────────────────────────────────────
   modalBackButton: {
     position: "absolute",
@@ -988,7 +1039,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 
   // ────────────────────────────────────────────────────────────────────────────
-  // “Where to Watch” placeholder section inside modal
+  // “Where to  Watch” placeholder section inside modal
   // ────────────────────────────────────────────────────────────────────────────
   modalWhereToWatchSection: {
     padding: "1rem",
@@ -1015,7 +1066,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 
   // ────────────────────────────────────────────────────────────────────────────
-  // Episode Info row: Air date / “Not watched” or watched date / Rating
+  // Episode Info row: Air date / “Not watched” or watched date / Rating / Check‐button
   // ────────────────────────────────────────────────────────────────────────────
   modalInfo: {
     display: "flex",
@@ -1027,8 +1078,9 @@ const styles: { [key: string]: React.CSSProperties } = {
   modalAirRatingRow: {
     display: "flex",
     alignItems: "center",
-    gap: "1.5rem",
+    gap: "1rem",
     marginBottom: "1rem",
+    position: "relative",
   },
   modalAirDate: {
     fontSize: "0.9rem",
@@ -1082,11 +1134,11 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 
   // ────────────────────────────────────────────────────────────────────────────
-  // Updated: “Previous” Arrow (left) just outside the image wrapper
+  // “Previous” Arrow (left) now sits outside modalContent
   // ────────────────────────────────────────────────────────────────────────────
   modalArrowLeft: {
     position: "absolute",
-    top: "calc(50% - 10px)",  // make it vertically center on the still‐image area
+    top: "calc(50% - 10px)",  // vertically center on the still‐image area
     left: "25%",              // arrow sits to left side of centered modalContent
     transform: "translateX(-100%) translateY(-50%)",
     backgroundColor: "rgba(255,255,255,0.8)",
@@ -1102,7 +1154,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 
   // ────────────────────────────────────────────────────────────────────────────
-  // Updated: “Next” Arrow (right) just outside the image wrapper
+  // “Next” Arrow (right) now sits outside modalContent
   // ────────────────────────────────────────────────────────────────────────────
   modalArrowRight: {
     position: "absolute",
