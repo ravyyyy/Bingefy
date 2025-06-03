@@ -712,9 +712,9 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
     style={{ marginBottom: "1.5rem" }}
   >
     <div style={styles.sectionHeader}>Watched History</div>
-    {watchedHistory.slice(0, historyCount).map((epi) =>
-      renderHistoryCard(epi)
-    )}
+    {[...watchedHistory.slice(0, historyCount)]
+  .reverse()
+  .map((epi) => renderHistoryCard(epi))}
   </div>
 )}
 
