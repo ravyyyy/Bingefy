@@ -124,28 +124,17 @@ export default function ShowsPage() {
           now.getTime() - 30 * 24 * 60 * 60 * 1000
         ).toISOString();
 
-        // Temporary arrays of EpisodeInfo (with empty title/overview/still initially)
-        const nextArr: EpisodeInfo[] = [];
-        const aWhileArr: EpisodeInfo[] = [];
-        const notStartedArr: EpisodeInfo[] = [];
+        // Temporary arrays of “candidates” (with empty data initially)
+        const nextArr: { showId: number; season: number; episode: number; label: string }[] = [];
+        const aWhileArr: { showId: number; season: number; episode: number; label: string }[] = [];
+        const notStartedArr: { showId: number; season: number; episode: number; label: string }[] = [];
 
         for (const showId of onboardedIds) {
           const watchedEntries = episodesWatchedMap[showId] || [];
 
           if (watchedEntries.length === 0) {
-            // Never watched → “Haven’t Started”: Season 1 Episode 1 (label "S1 E1")
-            notStartedArr.push({
-              showId,
-              showName: "",
-              poster_path: null,
-              season: 1,
-              episode: 1,
-              label: "S1 E1",
-              episodeTitle: "",
-              episodeOverview: "",
-              air_date: "",
-              still_path: null,
-            });
+            // Never watched → “Haven’t Started”: Season 1 Episode 1
+            notStartedArr.push({ showId, season: 1, episode: 1, label: "S1 E1" });
             continue;
           }
 
@@ -160,44 +149,30 @@ export default function ShowsPage() {
           const lastEpisode = mostRecent.episode;
 
           if (lastWatchedDate > thirtyDaysAgo) {
-            // Watched within last 30 days → “Watch Next”
+            // Watched in last 30 days → “Watch Next”
             nextArr.push({
               showId,
-              showName: "",
-              poster_path: null,
               season: lastSeason,
               episode: lastEpisode + 1,
               label: `S${lastSeason} E${lastEpisode + 1}`,
-              episodeTitle: "",
-              episodeOverview: "",
-              air_date: "",
-              still_path: null,
             });
           } else {
-            // Watched more than 30 days ago → “Haven’t Watched For A While”
+            // Watched >30 days ago → “Haven’t Watched For A While”
             aWhileArr.push({
               showId,
-              showName: "",
-              poster_path: null,
               season: lastSeason,
               episode: lastEpisode + 1,
               label: `Last seen S${lastSeason} E${lastEpisode}`,
-              episodeTitle: "",
-              episodeOverview: "",
-              air_date: "",
-              still_path: null,
             });
           }
         }
 
-        // Combine all EpisodeInfo entries to batch‐fetch show & episode details
-        const allEpisodes = [...nextArr, ...aWhileArr, ...notStartedArr];
+        // 2a) Pre‐load show details for all candidate showIds
+        const allCandidates = [...nextArr, ...aWhileArr, ...notStartedArr];
         const uniqueShowIds = Array.from(
-          new Set(allEpisodes.map((e) => e.showId))
+          new Set(allCandidates.map((e) => e.showId))
         );
         const detailsMap: Record<number, TVShow> = {};
-
-        // 2a) Fetch each show’s details (to fill showName + poster_path)
         await Promise.all(
           uniqueShowIds.map(async (sid) => {
             const det = await getTVShowDetails(sid);
@@ -205,58 +180,93 @@ export default function ShowsPage() {
           })
         );
 
-        // 2b) For each EpisodeInfo, fetch its specific episode details
-        await Promise.all(
-          allEpisodes.map(async (epi) => {
-            const det = detailsMap[epi.showId];
-            epi.showName = det.name;
-            epi.poster_path = det.poster_path;
+        // 2b) Build THREE “finalized” lists, but only include episodes that TMDB confirms exist
+        const finalizedNext: EpisodeInfo[] = [];
+        const finalizedAWhile: EpisodeInfo[] = [];
+        const finalizedNotStarted: EpisodeInfo[] = [];
 
-            // TMDB “Get Episode Details” returns air_date, name, overview, still_path
-            try {
-              const epDet: EpisodeDetail = await getEpisodeDetails(
-                epi.showId,
-                epi.season,
-                epi.episode
-              );
-              epi.episodeTitle = epDet.name;
-              epi.episodeOverview = epDet.overview;
-              epi.air_date = epDet.air_date;
-              epi.still_path = epDet.still_path;
-            } catch {
-              // If TMDB returns 404 (episode doesn’t exist), leave fields blank
-              epi.episodeTitle = "";
-              epi.episodeOverview = "";
-              epi.air_date = "";
-              epi.still_path = null;
-            }
+        // Helper function to attempt to fetch an episode; returns EpisodeInfo or null if 404
+        const tryBuildEpisode = async (
+        showId: number,
+        season: number,
+        episode: number,
+        label: string
+      ): Promise<EpisodeInfo | null> => {
+        // 1) First attempt: (season, episode)
+        try {
+          const epDet = await getEpisodeDetails(showId, season, episode);
+          const showDet = detailsMap[showId];
+          return {
+            showId,
+            showName: showDet.name,
+            poster_path: showDet.poster_path,
+            season,
+            episode,
+            label,
+            episodeTitle: epDet.name || "",
+            episodeOverview: epDet.overview || "",
+            air_date: epDet.air_date || "",
+            still_path: epDet.still_path || null,
+          };
+        } catch {
+          // 2) If that fails, attempt (season+1, episode=1)
+          const nextSeason = season + 1;
+          const nextEp = 1;
+          try {
+            const epDet2 = await getEpisodeDetails(showId, nextSeason, nextEp);
+            const showDet2 = detailsMap[showId];
+            return {
+              showId,
+              showName: showDet2.name,
+              poster_path: showDet2.poster_path,
+              season: nextSeason,
+              episode: nextEp,
+              label: `S${nextSeason} E${nextEp}`,
+              episodeTitle: epDet2.name || "",
+              episodeOverview: epDet2.overview || "",
+              air_date: epDet2.air_date || "",
+              still_path: epDet2.still_path || null,
+            };
+          } catch {
+            // 3) If that also fails, there is no “next” episode—return null
+            return null;
+          }
+        }
+      };
+
+        // Concurrently build all three lists:
+        await Promise.all(
+          nextArr.map(async (cand) => {
+            const epiInfo = await tryBuildEpisode(
+              cand.showId,
+              cand.season,
+              cand.episode,
+              cand.label
+            );
+            if (epiInfo) finalizedNext.push(epiInfo);
           })
         );
-
-        // Split back into final arrays
-        const finalizedNext = allEpisodes.filter((epi) =>
-          nextArr.some(
-            (n) =>
-              n.showId === epi.showId &&
-              n.season === epi.season &&
-              n.episode === epi.episode
-          )
+        await Promise.all(
+          aWhileArr.map(async (cand) => {
+            const epiInfo = await tryBuildEpisode(
+              cand.showId,
+              cand.season,
+              cand.episode,
+              cand.label
+            );
+            if (epiInfo) finalizedAWhile.push(epiInfo);
+          })
         );
-        const finalizedAWhile = allEpisodes.filter((epi) =>
-          aWhileArr.some(
-            (a) =>
-              a.showId === epi.showId &&
-              a.season === epi.season &&
-              a.episode === epi.episode
-          )
-        );
-        const finalizedNotStarted = allEpisodes.filter((epi) =>
-          notStartedArr.some(
-            (n) =>
-              n.showId === epi.showId &&
-              n.season === epi.season &&
-              n.episode === epi.episode
-          )
+        await Promise.all(
+          notStartedArr.map(async (cand) => {
+            const epiInfo = await tryBuildEpisode(
+              cand.showId,
+              cand.season,
+              cand.episode,
+              cand.label
+            );
+            if (epiInfo) finalizedNotStarted.push(epiInfo);
+          })
         );
 
         setWatchNextList(finalizedNext);
@@ -381,139 +391,165 @@ export default function ShowsPage() {
   // Helper: render the card for one episode in the scroll list
   // ─────────────────────────────────────────────────────────────
   const renderEpisodeCard = (epi: EpisodeInfo) => {
-  // Build a unique key for this episode:
-  const epiKey = `${epi.showId}-${epi.season}-${epi.episode}`;
+    // Build a unique key for this episode:
+    const epiKey = `${epi.showId}-${epi.season}-${epi.episode}`;
 
-  // Determine whether user has already watched this episode:
-  const watchedEntries = episodesWatchedMap[epi.showId] || [];
-  const isWatched = watchedEntries.some(
-    (we) => we.season === epi.season && we.episode === epi.episode
-  );
+    // Determine whether user has already watched this episode:
+    const watchedEntries = episodesWatchedMap[epi.showId] || [];
+    const isWatched = watchedEntries.some(
+      (we) => we.season === epi.season && we.episode === epi.episode
+    );
 
-  // Is this episode currently in “animating → turning green” state?
-  const isAnimating = animatingIds.has(epiKey);
+    // Is this episode currently in “animating → turning green” state?
+    const isAnimating = animatingIds.has(epiKey);
 
-  return (
-    <div
-      key={epiKey}
-      style={styles.epiCard}
-      onClick={() => setModalEpisode(epi)} // open modal on card click
-    >
-      {/*
-        Use the show’s poster here (epi.poster_path), not the episode’s still.
-        If poster_path is missing, fall back to a “No Image” placeholder.
-      */}
-      {epi.poster_path ? (
-        <img
-          src={`${POSTER_BASE_URL}${epi.poster_path}`}
-          alt={epi.showName}
-          style={styles.epiPoster}
-        />
-      ) : (
-        <div style={styles.noImage}>No Image</div>
-      )}
-
-      <div style={styles.epiInfo}>
-        <span style={styles.showName}>{epi.showName}</span>
-        <span style={styles.epiLabel}>{epi.label}</span>
-        {epi.episodeTitle && (
-          <span style={styles.epiTitle}>{epi.episodeTitle}</span>
+    return (
+      <div
+        key={epiKey}
+        style={styles.epiCard}
+        onClick={() => setModalEpisode(epi)} // open modal on card click
+      >
+        {/*
+          Use the show’s poster here (epi.poster_path), not the episode’s still.
+          If poster_path is missing, fall back to a “No Image” placeholder.
+        */}
+        {epi.poster_path ? (
+          <img
+            src={`${POSTER_BASE_URL}${epi.poster_path}`}
+            alt={epi.showName}
+            style={styles.epiPoster}
+          />
+        ) : (
+          <div style={styles.noImage}>No Image</div>
         )}
-        {epi.episodeOverview && (
-          <p style={styles.epiOverview}>
-            {epi.episodeOverview /* full description, no truncation */}
-          </p>
-        )}
-      </div>
 
-      {/* Nice circular button to mark watched (white → animate to green) */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation(); // don’t open modal if button clicked
+        <div style={styles.epiInfo}>
+          <span style={styles.showName}>{epi.showName}</span>
+          <span style={styles.epiLabel}>{epi.label}</span>
+          {epi.episodeTitle && (
+            <span style={styles.epiTitle}>{epi.episodeTitle}</span>
+          )}
+          {epi.episodeOverview && (
+            <p style={styles.epiOverview}>
+              {epi.episodeOverview /* full description, no truncation */}
+            </p>
+          )}
+        </div>
 
-          if (!isWatched && !isAnimating) {
-            // 1) Capture which sub‐array (“group”) this episode is in right now:
-            let groupForThis: EpisodeInfo[] = [];
-            if (activeTab === 0) {
-              if (
-                watchNextList.some(
-                  (x) =>
-                    x.showId === epi.showId &&
-                    x.season === epi.season &&
-                    x.episode === epi.episode
-                )
-              ) {
-                groupForThis = watchNextList;
-              } else if (
-                watchedAWhileList.some(
-                  (x) =>
-                    x.showId === epi.showId &&
-                    x.season === epi.season &&
-                    x.episode === epi.episode
-                )
-              ) {
-                groupForThis = watchedAWhileList;
+        {/* Nice circular button to mark watched (white → animate to green) */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation(); // don’t open modal if button clicked
+
+            if (!isWatched && !isAnimating) {
+              // 1) Capture which sub‐array (“group”) this episode is in right now:
+              let groupForThis: EpisodeInfo[] = [];
+              if (activeTab === 0) {
+                if (
+                  watchNextList.some(
+                    (x) =>
+                      x.showId === epi.showId &&
+                      x.season === epi.season &&
+                      x.episode === epi.episode
+                  )
+                ) {
+                  groupForThis = watchNextList;
+                } else if (
+                  watchedAWhileList.some(
+                    (x) =>
+                      x.showId === epi.showId &&
+                      x.season === epi.season &&
+                      x.episode === epi.episode
+                  )
+                ) {
+                  groupForThis = watchedAWhileList;
+                } else {
+                  groupForThis = notStartedList;
+                }
               } else {
-                groupForThis = notStartedList;
+                // “Upcoming” tab
+                groupForThis = upcomingList;
               }
-            } else {
-              // “Upcoming” tab
-              groupForThis = upcomingList;
-            }
 
-            // 2) Put this epiKey into “animating” set
-            setAnimatingIds((prev) => {
-              const copy = new Set(prev);
-              copy.add(epiKey);
-              return copy;
-            });
-
-            // 3) After a brief delay (400 ms), mark watched & advance
-            setTimeout(() => {
-              // a) Mark as watched in Firestore & local state
-              markAsWatched(epi);
-
-              // b) Remove from animating set
+              // 2) Put this epiKey into “animating” set
               setAnimatingIds((prev) => {
                 const copy = new Set(prev);
-                copy.delete(epiKey);
+                copy.add(epiKey);
                 return copy;
               });
 
-              // c) Advance to next episode in the captured sub‐array
-              const idxInGroup = groupForThis.findIndex(
-                (x) =>
-                  x.showId === epi.showId &&
-                  x.season === epi.season &&
-                  x.episode === epi.episode
-              );
-              if (idxInGroup >= 0 && idxInGroup + 1 < groupForThis.length) {
-                setModalEpisode(groupForThis[idxInGroup + 1]);
-              } else {
-                setModalEpisode(null);
-              }
-            }, 400); // 400ms for the white→green transition
-          }
-        }}
-        style={{
-          // If already watched, show gray badge. Otherwise:
-          //   - if animating: green background + white check
-          //   - if not yet pressed: white circle + dark check
-          ...(isWatched
-            ? styles.cardWatchedBadge
-            : {
-                ...styles.cardWatchBtn,
-                backgroundColor: isAnimating ? "#28a745" : "#ffffff",
-                color: isAnimating ? "#ffffff" : "#000000",
-              }),
-        }}
-      >
-        {isWatched ? "✔️" : "✓"}
-      </button>
-    </div>
-  );
-};
+              // 3) After a brief delay (400 ms), mark watched & advance
+              setTimeout(async () => {
+                // a) Mark as watched in Firestore & local state
+                markAsWatched(epi);
 
+                // b) Remove from animating set
+                setAnimatingIds((prev) => {
+                  const copy = new Set(prev);
+                  copy.delete(epiKey);
+                  return copy;
+                });
+
+                // c) Attempt to advance to next episode via TMDB lookups:
+                const showId = epi.showId;
+                let nextSeason = epi.season;
+                let nextEpisode = epi.episode + 1;
+                let nextDetails: EpisodeDetail | null = null;
+
+                // Try same season, next episode first:
+                try {
+                  nextDetails = await getEpisodeDetails(
+                    showId,
+                    nextSeason,
+                    nextEpisode
+                  );
+                } catch {
+                  nextDetails = null;
+                }
+
+                if (nextDetails) {
+                  // We found a valid “next” episode in the SAME season.
+                  const showDet = await getTVShowDetails(showId);
+                  const nextLabel = `S${nextSeason} E${nextEpisode}`;
+                  const newEpisodeInfo: EpisodeInfo = {
+                    showId,
+                    showName: showDet.name,
+                    poster_path: showDet.poster_path,
+                    season: nextSeason,
+                    episode: nextEpisode,
+                    label: nextLabel,
+                    episodeTitle: nextDetails.name,
+                    episodeOverview: nextDetails.overview,
+                    air_date: nextDetails.air_date,
+                    still_path: nextDetails.still_path,
+                  };
+                  // Open the modal for that same‐season next episode
+                  setModalEpisode(newEpisodeInfo);
+                } else {
+                  // We do NOT auto‐open “next season.” Just close modal.
+                  setModalEpisode(null);
+                }
+              }, 400); // 400ms for the white→green transition
+            }
+          }}
+          style={{
+            // If already watched, show gray badge. Otherwise:
+            //   - if animating: green background + white check
+            //   - if not yet pressed: white circle + dark check
+            ...(isWatched
+              ? styles.cardWatchedBadge
+              : {
+                  ...styles.cardWatchBtn,
+                  backgroundColor: isAnimating ? "#28a745" : "#ffffff",
+                  color: isAnimating ? "#ffffff" : "#000000",
+                }),
+          }}
+        >
+          {isWatched ? "✔️" : "✓"}
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div style={styles.container}>
@@ -669,12 +705,12 @@ export default function ShowsPage() {
               {(() => {
                 const watchedEntries =
                   episodesWatchedMap[modalEpisode.showId] || [];
-                const isWatched = watchedEntries.some(
+                const already = watchedEntries.some(
                   (we) =>
                     we.season === modalEpisode.season &&
                     we.episode === modalEpisode.episode
                 );
-                if (!isWatched) {
+                if (!already) {
                   return (
                     <button
                       style={styles.modalMarkAsWatchedBtn}
@@ -739,7 +775,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     padding: "0.5rem",
     marginBottom: "0.5rem",
     cursor: "pointer",
-    position: "relative", // so the watch button can sit absolute
+    position: "relative",
   },
   epiPoster: {
     width: "80px",
