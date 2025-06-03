@@ -27,10 +27,7 @@ export function Step2PickShows() {
     useRef<HTMLDivElement>(null),
     useRef<HTMLDivElement>(null),
   ];
-  const addedRefs = [
-    useRef<HTMLDivElement>(null),
-    useRef<HTMLDivElement>(null),
-  ];
+  const addedRefs = [useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null)];
 
   // A ref to detect whether the user actually dragged (so we don’t toggle on drag)
   const didDragRef = useRef(false);
@@ -203,6 +200,22 @@ export function Step2PickShows() {
       <p style={styles.instructions}>
         Choose TV shows you’ve watched, are watching, or plan to watch.
       </p>
+
+      {/* ─────────── TOP “Next” BUTTON ─────────── */}
+      <div style={styles.topButtonContainer}>
+        <button
+          onClick={handleNext}
+          disabled={selectedShows.size === 0}
+          style={{
+            ...styles.nextButton,
+            opacity: selectedShows.size > 0 ? 1 : 0.5,
+            cursor: selectedShows.size > 0 ? "pointer" : "not-allowed",
+          }}
+        >
+          Next
+        </button>
+      </div>
+
       {error && <p style={styles.error}>{error}</p>}
 
       {/* ─────────── TRENDING SHOWS – ROW 1 ─────────── */}
@@ -291,7 +304,7 @@ export function Step2PickShows() {
         ))}
       </div>
 
-      {/* ─────────── BOTTOM “Next” BUTTON ONLY ─────────── */}
+      {/* ─────────── BOTTOM “Next” BUTTON ─────────── */}
       <div style={styles.bottomButtonsContainer}>
         <button
           onClick={handleNext}
@@ -322,6 +335,11 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontSize: "1rem",
     marginBottom: "1rem",
     textAlign: "center",
+  },
+  topButtonContainer: {
+    display: "flex",
+    justifyContent: "center",
+    marginBottom: "1rem",
   },
   categoryTitle: {
     fontSize: "1.1rem",
