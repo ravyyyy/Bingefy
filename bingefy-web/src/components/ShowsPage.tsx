@@ -15,6 +15,7 @@ import {
 } from "../services/tmdbClients";
 import type { DocumentData } from "firebase/firestore";
 import { getTVWatchProviders, type WatchProvidersResponse } from "../services/tmdbClients";
+import { Calendar, Eye } from "lucide-react";
 
 const POSTER_BASE_URL = "https://image.tmdb.org/t/p/w300"; // larger size for episode stills
 // small/w300 is fine for lists, but we want bigger for the modal
@@ -1155,15 +1156,15 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
             <div style={styles.modalInfo}>
               {/* ─── Air Date / “Not watched”~“Watched on” / Rating / ✓ button ─── */}
               <div style={styles.modalAirRatingRow}>
-  {/* ───── Calendar icon + pretty date ───── */}
-  <span style={styles.modalIcon}>📅</span>
+  {/* ─── Calendar icon + formatted air date ─── */}
+  <Calendar size={16} color="#bbb" style={{ marginRight: "4px" }} />
   <span style={styles.modalAirDateText}>
     {modalEpisode.air_date
       ? formatPrettyDate(modalEpisode.air_date)
       : "Unknown"}
   </span>
 
-  {/* ───── Eye icon + watched status ───── */}
+  {/* ─── Eye icon + Watched/Not watched ─── */}
   {(() => {
     const watchedEntries = episodesWatchedMap[modalEpisode.showId] || [];
     const match = watchedEntries.find(
@@ -1172,32 +1173,30 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
         we.episode === modalEpisode.episode
     );
     if (match) {
-      // Already watched → show eye icon + watched-on date
       return (
         <>
-          <span style={styles.modalIcon}>👁️</span>
+          <Eye size={16} color="#ff6666" style={{ marginLeft: "1rem", marginRight: "4px" }} />
           <span style={styles.notWatchedOrDate}>
             {formatPrettyDate(match.watchedAt.split("T")[0])}
           </span>
         </>
       );
     } else {
-      // Not watched yet → eye icon + “Not watched”
       return (
         <>
-          <span style={styles.modalIcon}>👁️</span>
+          <Eye size={16} color="#ff6666" style={{ marginLeft: "1rem", marginRight: "4px" }} />
           <span style={styles.notWatchedOrDate}>Not watched</span>
         </>
       );
     }
   })()}
 
-  {/* ───── Rating percentage ───── */}
+  {/* ─── Rating percentage ─── */}
   <p style={styles.modalRatingPercent}>
     {Math.round(modalEpisode.vote_average * 10)}%
   </p>
 
-  {/* ───── “Mark as Watched” button (unchanged) ───── */}
+  {/* ─── “Mark as Watched” button (unchanged) ─── */}
   {(() => {
     const watchedEntries = episodesWatchedMap[modalEpisode.showId] || [];
     const isAlready = watchedEntries.some(
@@ -1235,7 +1234,6 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
     );
   })()}
 </div>
-
 
               {/* Full Episode Overview */}
               {modalEpisode.episodeOverview && (
@@ -1667,11 +1665,6 @@ tabButtonActive: {
     gap: "0.75rem",
     marginBottom: "1rem",
     position: "relative",
-  },
-  // Style for the calendar/eye icons so they’re aligned and not too big:
-  modalIcon: {
-    fontSize: "1rem",      // same as your text, or adjust slightly (e.g. 1.1rem)
-    lineHeight: 1,
   },
 
   // Air date text (same color as before, just no “Air Date:” prefix)

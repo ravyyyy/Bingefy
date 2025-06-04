@@ -4,6 +4,7 @@
   },
   "dependencies": {
     "firebase": "^11.8.1",
+    "lucide-react": "^0.513.0",
     "react-router-dom": "^6.30.1"
   }
 }
