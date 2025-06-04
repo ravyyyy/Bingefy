@@ -316,6 +316,33 @@ export default function ShowsPage() {
     })();
   }, [user]);
 
+// ───── Existing state & effect somewhere near the top of your component ─────
+const [seasonEpisodes, setSeasonEpisodes] = useState<number[]>([]);
+
+useEffect(() => {
+  if (!modalEpisode) {
+    setSeasonEpisodes([]);
+    return;
+  }
+
+  (async () => {
+    try {
+      const seasonInfo: SeasonDetail = await getSeasonDetails(
+        modalEpisode.showId,
+        modalEpisode.season
+      );
+      const eps = seasonInfo.episodes
+        .map((e) => e.episode_number)
+        .sort((a, b) => a - b);
+      setSeasonEpisodes(eps);
+    } catch (err) {
+      console.error("Failed to fetch season episodes:", err);
+      setSeasonEpisodes([]);
+    }
+  })();
+}, [modalEpisode]);
+
+
   // ─────────────────────────────────────────────────────────────
   // 2) Build “Watch Next”, “Haven’t Watched For A While”, “Haven’t Started”
   //    whenever onboardedIds or episodesWatchedMap changes
@@ -1072,7 +1099,6 @@ export default function ShowsPage() {
       ◀
     </button>
 
-    {/* ─────────── Modal Content ─────────── */}
     <div
       style={styles.modalContent}
       onClick={(e) => e.stopPropagation()}
@@ -1086,6 +1112,73 @@ export default function ShowsPage() {
       >
         ← Back to Show
       </button>
+
+      {/* ─────────── Sliding‐Window Episode‐Indicator Dots Row ─────────── */}
+{(() => {
+  const MAX_DOTS = 7;
+  const total = seasonEpisodes.length;
+  const currentEp = modalEpisode.episode;
+  const idx = seasonEpisodes.indexOf(currentEp);
+
+  if (idx === -1 || total === 0) {
+    // If something went wrong or no seasonEpisodes, just render nothing:
+    return null;
+  }
+
+  // Determine start/end indices for a window of up to MAX_DOTS
+  const half = Math.floor(MAX_DOTS / 2);
+  let start = Math.max(0, idx - half);
+  let end = start + MAX_DOTS;
+  if (end > total) {
+    end = total;
+    start = Math.max(0, end - MAX_DOTS);
+  }
+
+  const visibleDots = seasonEpisodes.slice(start, end);
+
+  return (
+    <div style={styles.dotsContainer}>
+      {visibleDots.map((epNum) => {
+        const isActive = epNum === currentEp;
+        return (
+          <span
+            key={epNum}
+            style={isActive ? styles.activeDot : styles.dot}
+            onClick={async (e) => {
+              e.stopPropagation();
+              if (epNum === currentEp) return;
+
+              // Fetch details for the clicked episode index
+              try {
+                const epDetail = await getEpisodeDetails(
+                  modalEpisode.showId,
+                  modalEpisode.season,
+                  epNum
+                );
+                const showDet = await getTVShowDetails(modalEpisode.showId);
+                setModalEpisode({
+                  showId: modalEpisode.showId,
+                  showName: showDet.name,
+                  poster_path: showDet.poster_path,
+                  season: modalEpisode.season,
+                  episode: epNum,
+                  label: `S${modalEpisode.season} E${epNum}`,
+                  episodeTitle: epDetail.name,
+                  episodeOverview: epDetail.overview,
+                  air_date: epDetail.air_date,
+                  still_path: epDetail.still_path,
+                  vote_average: epDetail.vote_average || 0,
+                });
+              } catch (err) {
+                console.error("Failed to load selected episode:", err);
+              }
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+})()}
 
       {/* ─────────── Episode Banner Image + Overlay ─────────── */}
       <div style={styles.modalImageWrapper}>
@@ -1114,29 +1207,24 @@ export default function ShowsPage() {
       {/* ─────────── “Where to Watch” Section ─────────── */}
       <div style={styles.modalWhereToWatchSection}>
         <h3 style={styles.modalWhereToWatchHeader}>Where to watch</h3>
-
         {modalProviders.length > 0 ? (
           <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
             {modalProviders.map((prov) => {
-              // Compute a brand color based on provider_name:
-              let bgColor = "#222"; // default dark gray
-
+              let bgColor = "#222"; // default
               const name = prov.provider_name.toLowerCase();
               if (name.includes("netflix")) {
-                bgColor = "#e50914"; // Netflix red
+                bgColor = "#e50914";
               } else if (name.includes("disney")) {
-                bgColor = "#0072d2"; // Disney blue
+                bgColor = "#0072d2";
               } else if (name.includes("prime")) {
-                bgColor = "#00a8e1"; // Prime Video light-blue
+                bgColor = "#00a8e1";
               } else if (name.includes("hulu")) {
-                bgColor = "#1ce783"; // Hulu green
+                bgColor = "#1ce783";
               } else if (name.includes("hbo")) {
-                bgColor = "#343434"; // HBO charcoal
+                bgColor = "#343434";
               } else if (name.includes("crunchyroll")) {
-                bgColor = "#f27c00"; // Crunchyroll orange
+                bgColor = "#f27c00";
               }
-              // (Add more cases here if needed.)
-
               return (
                 <a
                   key={prov.provider_id}
@@ -1162,28 +1250,22 @@ export default function ShowsPage() {
 
       {/* ─────────── Episode Info Section ─────────── */}
       <div style={styles.modalInfo}>
-        {/* ─── Air Date / Watched‐Status / Rating / ✓ button ─── */}
         <div style={styles.modalAirRatingRow}>
-          {/* ─── Calendar icon + formatted air date ─── */}
           <Calendar size={16} color="#bbb" style={{ marginRight: "-3px" }} />
           <span style={styles.modalAirDateText}>
             {modalEpisode.air_date
               ? formatPrettyDate(modalEpisode.air_date)
               : "Unknown"}
           </span>
-
-          {/* ─── Eye icon + Watched/Not watched ─── */}
           {(() => {
-            const watchedEntries = episodesWatchedMap[modalEpisode.showId] || [];
+            const watchedEntries =
+              episodesWatchedMap[modalEpisode.showId] || [];
             const match = watchedEntries.find(
               (we) =>
                 we.season === modalEpisode.season &&
                 we.episode === modalEpisode.episode
             );
-
-            // If watched, eye icon is green; if not, eye icon is red.
             const eyeColor = match ? "#28a745" : "#ff6666";
-
             return (
               <>
                 <Eye
@@ -1205,8 +1287,6 @@ export default function ShowsPage() {
               </>
             );
           })()}
-
-          {/* ─── Rating percentage ─── */}
           <p
             style={{
               ...styles.modalRatingPercent,
@@ -1216,10 +1296,9 @@ export default function ShowsPage() {
           >
             {Math.round(modalEpisode.vote_average * 10)}%
           </p>
-
-          {/* ─── “Mark as Watched” button ─── */}
           {(() => {
-            const watchedEntries = episodesWatchedMap[modalEpisode.showId] || [];
+            const watchedEntries =
+              episodesWatchedMap[modalEpisode.showId] || [];
             const isAlready = watchedEntries.some(
               (we) =>
                 we.season === modalEpisode.season &&
@@ -1256,7 +1335,6 @@ export default function ShowsPage() {
           })()}
         </div>
 
-        {/* ─────────── Episode Overview ─────────── */}
         {modalEpisode.episodeOverview && (
           <div style={styles.modalOverviewSection}>
             <h4 style={styles.modalOverviewHeader}>Episode Info</h4>
@@ -1332,7 +1410,6 @@ export default function ShowsPage() {
     </button>
   </div>
 )}
-
       </div>
     </>
   );
@@ -1758,5 +1835,28 @@ modalArrowRight: {
   borderRadius: "50%",
   cursor: "pointer",
   zIndex: 3,
+},
+// ─────────────── Episode‐Indicator Dots ───────────────
+dotsContainer: {
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  gap: "6px",
+  padding: "8px 0",
+  backgroundColor: "#000",
+},
+dot: {
+  width: "8px",
+  height: "8px",
+  borderRadius: "50%",
+  backgroundColor: "#555",
+  cursor: "pointer",
+},
+activeDot: {
+  width: "8px",
+  height: "8px",
+  borderRadius: "50%",
+  backgroundColor: "#00C6FF",  // ← changed from "#fff" to your logo‐red
+  cursor: "pointer",
 },
 };
