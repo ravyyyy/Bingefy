@@ -205,6 +205,9 @@ export default function ShowsPage() {
     new Set()
   );
 
+  // Which Past‐groups are open?
+  const [expandedPastGroups, setExpandedPastGroups] = useState<Set<string>>(new Set());
+
   // 0 = “Watch List” tab, 1 = “Upcoming” tab
   const [activeTab, setActiveTab] = useState<0 | 1>(0);
 
@@ -289,9 +292,12 @@ export default function ShowsPage() {
 
   // Reset “Watch History” lazy loader whenever we revisit tab 0
   useEffect(() => {
-    if (activeTab === 0) {
+    if (activeTab === 1) {
       setHistoryCount(5);
       setHistoryInitialized(false);
+    }
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = 0;
     }
   }, [activeTab]);
 
@@ -1134,92 +1140,178 @@ export default function ShowsPage() {
 
         {/* ─────────── “Past Episodes” (lazy-loaded above Upcoming) ─────────── */}
         {activeTab === 1 && (
-          <div style={{ marginBottom: "2rem" }}>
-            {pastEpisodes.length === 0 ? (
-              <p style={styles.emptyText}>No past episodes yet.</p>
-            ) : (
-              <div ref={pastContainerRef}>
-                {(() => {
-                  // ───── UPDATED: build the visible slice in descending-date order,
-                  // then reverse so that the oldest of those appears first in the DOM.
-                  const visibleWindow = pastEpisodes.slice(0, pastCount);
-                  const reversedWindow = [...visibleWindow].reverse();
+  <div style={{ marginBottom: "2rem" }}>
+    {pastEpisodes.length === 0 ? (
+      <p style={styles.emptyText}>No past episodes yet.</p>
+    ) : (
+      <div ref={pastContainerRef}>
+        {(() => {
+          // 1) Get the window of episodes to show (5 * pastCount), newest first, then reverse so oldest goes first in the DOM.
+          const visibleWindow = pastEpisodes.slice(0, pastCount);
+          const reversedWindow = [...visibleWindow].reverse();
 
-                  // Group by date ascending
-                  const groupedPast: Record<string, EpisodeInfo[]> = {};
-                  reversedWindow.forEach((epi) => {
-                    const dateLabel = formatPrettyDate(epi.air_date);
-                    if (!groupedPast[dateLabel]) {
-                      groupedPast[dateLabel] = [];
-                    }
-                    groupedPast[dateLabel].push(epi);
-                  });
+          // 2) First-level grouping: by pretty-printed date
+          const groupedByDate: Record<string, EpisodeInfo[]> = {};
+          reversedWindow.forEach((epi) => {
+            const dateLabel = formatPrettyDate(epi.air_date);
+            if (!groupedByDate[dateLabel]) {
+              groupedByDate[dateLabel] = [];
+            }
+            groupedByDate[dateLabel].push(epi);
+          });
 
-                  // Sort date keys ascending (oldest date first)
-                  const dateKeysAsc = Object.keys(groupedPast).sort((a, b) => {
-                    const da = new Date(a);
-                    const db = new Date(b);
-                    return da.getTime() - db.getTime();
-                  });
+          // 3) Sort the date keys ascending (oldest date first).
+          const dateKeysAsc = Object.keys(groupedByDate).sort((a, b) => {
+            const da = new Date(a);
+            const db = new Date(b);
+            return da.getTime() - db.getTime();
+          });
 
-                  return dateKeysAsc.map((dateLabel) => (
-                    <div key={dateLabel} style={styles.section}>
-                      {/* ─── Removed the floating “PAST EPISODES” badge here ─── */}
-                      <div style={styles.sectionBadge}>
-                        <span style={styles.sectionBadgeText}>{dateLabel}</span>
-                      </div>
-                      {groupedPast[dateLabel].map((epi) => {
-                        const epiKey = `${epi.showId}-${epi.season}-${epi.episode}-past`;
-                        return (
-                          <div
-                            key={epiKey}
+          return dateKeysAsc.map((dateLabel) => {
+            // All episodes that aired on this date:
+            const episodesOnThisDate = groupedByDate[dateLabel];
+
+            // Second-level grouping: by showId within this date
+            const byShow: Record<number, EpisodeInfo[]> = {};
+            episodesOnThisDate.forEach((epi) => {
+              if (!byShow[epi.showId]) byShow[epi.showId] = [];
+              byShow[epi.showId].push(epi);
+            });
+
+            return (
+              <div key={dateLabel} style={styles.section}>
+                {/* The date badge at top */}
+                <div style={styles.sectionBadge}>
+                  <span style={styles.sectionBadgeText}>{dateLabel}</span>
+                </div>
+
+                {/*
+                  For each show that has one or more episodes on this date,
+                  render a “show-header” (collapsed by default) with the poster, name,
+                  number of episodes, and a ▶/▾ arrow. Clicking it toggles the per-show episodes.
+                */}
+                {Object.entries(byShow).map(([showIdStr, episodesArr]) => {
+                  const showId = Number(showIdStr);
+                  // We’ll use the first episode to grab poster + showName + date
+                  const firstEpi = episodesArr[0];
+
+                  // Build a unique key that combines date + showId.
+                  // We’ll keep which ones are open in expandedPastGroups.
+                  const groupKey = `${dateLabel}-${showId}`;
+                  const isOpen = expandedPastGroups.has(groupKey);
+
+                  return (
+                    <React.Fragment key={groupKey}>
+                      {/*** Collapsed “show‐header” row ***/}
+                      <div
+                        style={{
+                          ...styles.epiCard,
+                          backgroundColor: "#2a2a2a",
+                          padding: "1rem",
+                          marginBottom: "0.25rem",
+                          display: "flex",
+                          alignItems: "center",
+                          cursor: "pointer",
+                        }}
+                        onClick={() => {
+                          const copy = new Set(expandedPastGroups);
+                          if (isOpen) copy.delete(groupKey);
+                          else copy.add(groupKey);
+                          setExpandedPastGroups(copy);
+                        }}
+                      >
+                        {/* Show the poster (small) */}
+                        {firstEpi.poster_path ? (
+                          <img
+                            src={`${POSTER_BASE_URL}${firstEpi.poster_path}`}
+                            alt={firstEpi.showName}
                             style={{
-                              ...styles.epiCard,
-                              backgroundColor: "#2a2a2a", // greyed-out
+                              width: "60px",
+                              height: "90px",
+                              objectFit: "cover",
+                              borderRadius: "4px",
+                              marginRight: "1rem",
                             }}
-                            onClick={() => setModalEpisode(epi)}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              ...styles.noImage,
+                              width: "60px",
+                              height: "90px",
+                              marginRight: "1rem",
+                            }}
                           >
-                            {epi.poster_path ? (
-                              <img
-                                src={`${POSTER_BASE_URL}${epi.poster_path}`}
-                                alt={epi.showName}
-                                style={styles.epiPoster}
-                              />
-                            ) : (
-                              <div style={styles.noImage}>No Image</div>
-                            )}
-
-                            <div style={styles.epiInfo}>
-                              <span style={{ ...styles.showName, color: "#bbb" }}>
-                                {epi.showName}
-                              </span>
-                              <span style={{ ...styles.epiLabel, color: "#aaa" }}>
-                                {epi.label}
-                              </span>
-                              {epi.episodeTitle && (
-                                <span style={{ ...styles.epiTitle, color: "#ccc" }}>
-                                  {epi.episodeTitle}
-                                </span>
-                              )}
-                              {epi.episodeOverview && (
-                                <p style={{ ...styles.epiOverview, color: "#ccc" }}>
-                                  {epi.episodeOverview}
-                                </p>
-                              )}
-                              {/* ─── Removed the “Aired: … • Provider: …” line here ─── */}
-                            </div>
+                            No Image
                           </div>
-                        );
-                      })}
-                    </div>
-                  ));
-                })()}
-              </div>
-            )}
+                        )}
 
-            {/* ─── Removed the “Scroll up to load more…” message entirely ─── */}
-          </div>
-        )}
+                        <div style={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
+                          <span style={{ ...styles.showName, color: "#bbb" }}>
+                            {firstEpi.showName}
+                          </span>
+                          <span style={{ ...styles.epiLabel, color: "#aaa" }}>
+                            {episodesArr.length} episode{episodesArr.length > 1 ? "s" : ""}
+                          </span>
+                        </div>
+
+                        {/*** Expand/collapse arrow ***/}
+                        <div style={{ fontSize: "1.2rem", color: "#888" }}>
+                          {isOpen ? "▾" : "▸"}
+                        </div>
+                      </div>
+
+                      {/*** If this show‐group is open, render each episode ***/}
+                      {isOpen &&
+                        episodesArr.map((epi) => {
+                          const epiKey = `${epi.showId}-${epi.season}-${epi.episode}-past`;
+                          return (
+                            <div
+                              key={epiKey}
+                              style={{
+                                ...styles.epiCard,
+                                backgroundColor: "#222",
+                                padding: "0.75rem",
+                                marginBottom: "0.25rem",
+                                marginLeft: "72px", // indent under the show‐header
+                                display: "flex",
+                                alignItems: "flex-start",
+                                cursor: "pointer",
+                              }}
+                              onClick={() => setModalEpisode(epi)}
+                            >
+                              {/* Small left spacer so we align under poster */}
+                              <div style={{ width: "40px", marginRight: "0.75rem" }} />
+
+                              <div style={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
+                                <span style={{ ...styles.epiLabel, color: "#ccc" }}>
+                                  S{epi.season} | E{epi.episode}
+                                </span>
+                                {epi.episodeTitle && (
+                                  <span style={{ ...styles.epiTitle, color: "#eee" }}>
+                                    {epi.episodeTitle}
+                                  </span>
+                                )}
+                                {epi.episodeOverview && (
+                                  <p style={{ ...styles.epiOverview, color: "#aaa" }}>
+                                    {epi.episodeOverview}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            );
+          });
+        })()}
+      </div>
+    )}
+  </div>
+)}
 
         {/* ─────────── “Upcoming” (under Past Episodes) ─────────── */}
         {activeTab === 1 && (
