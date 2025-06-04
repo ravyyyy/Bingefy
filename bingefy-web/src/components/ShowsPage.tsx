@@ -1263,7 +1263,10 @@ export default function ShowsPage() {
 
                       {/*** If this show‐group is open, render each episode ***/}
                       {isOpen &&
-                        episodesArr.map((epi) => {
+                        // Sort by episode number ascending: 7, 8, 9, …
+                 episodesArr
+                   .sort((a, b) => a.episode - b.episode)
+                   .map((epi) => {
                           const epiKey = `${epi.showId}-${epi.season}-${epi.episode}-past`;
                           return (
                             <div
