@@ -1283,8 +1283,22 @@ export default function ShowsPage() {
                               }}
                               onClick={() => setModalEpisode(epi)}
                             >
-                              {/* Small left spacer so we align under poster */}
-                              <div style={{ width: "40px", marginRight: "0.75rem" }} />
+                              {/* Show episode still if available */}
+         {epi.still_path ? (
+           <img
+             src={`${STILL_BASE_URL}${epi.still_path}`}
+             alt={`${epi.showName} S${epi.season}E${epi.episode}`}
+             style={{
+               width: "60px",
+               height: "90px",
+               objectFit: "cover",
+               borderRadius: "4px",
+               marginRight: "0.75rem",
+             }}
+           />
+         ) : (
+           <div style={{ width: "60px", height: "90px", marginRight: "0.75rem" }} />
+         )}
 
                               <div style={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
                                 <span style={{ ...styles.epiLabel, color: "#ccc" }}>
