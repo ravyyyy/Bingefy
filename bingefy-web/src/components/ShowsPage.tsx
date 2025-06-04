@@ -1088,29 +1088,51 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
               <h3 style={styles.modalWhereToWatchHeader}>Where to watch</h3>
 
               {modalProviders.length > 0 ? (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                  {modalProviders.map((prov) => (
-                    <a
-                      key={prov.provider_id}
-                      href={modalProvidersLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        ...styles.modalProviderButton,
-                        backgroundImage: prov.logo_path
-                          ? `url(https://image.tmdb.org/t/p/original${prov.logo_path})`
-                          : undefined,
-                      }}
-                    >
-                      {prov.provider_name}
-                    </a>
-                  ))}
-                </div>
-              ) : (
-                <p style={{ color: "#aaa", fontSize: "14px" }}>
-                  No streaming providers found in your region.
-                </p>
-              )}
+  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+    {modalProviders.map((prov) => {
+      // Compute a brand color based on provider_name:
+      let bgColor = "#222"; // default dark gray
+
+      const name = prov.provider_name.toLowerCase();
+      if (name.includes("netflix")) {
+        bgColor = "#e50914";       // Netflix red
+      } else if (name.includes("disney")) {
+        bgColor = "#0072d2";       // Disney blue
+      } else if (name.includes("prime")) {
+        bgColor = "#00a8e1";       // Prime Video light-blue
+      } else if (name.includes("hulu")) {
+        bgColor = "#1ce783";       // Hulu green
+      } else if (name.includes("hbo")) {
+        bgColor = "#343434";       // HBO charcoal
+      } else if (name.includes("crunchyroll")) {
+        bgColor = "#f27c00";       // Crunchyroll orange
+      }
+      // (Add more cases here if needed.)
+
+      return (
+        <a
+          key={prov.provider_id}
+          href={modalProvidersLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            ...styles.modalProviderButton,
+            backgroundColor: bgColor,
+            // Remove backgroundImage entirely—no logos anymore
+          }}
+        >
+          {prov.provider_name}
+        </a>
+      );
+    })}
+  </div>
+) : (
+  <p style={{ color: "#aaa", fontSize: "14px" }}>
+    No streaming providers found in your region.
+  </p>
+)}
+
+
             </div>
 
             {/* ─────────── Episode Info Section ─────────── */}
@@ -1573,23 +1595,24 @@ tabButtonActive: {
   // Provider‐button style (each streaming‐service “pill”)
   // ────────────────────────────────────────────────────────────────────────────
   modalProviderButton: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "0.5rem 1rem",
-    backgroundColor: "#222",
-    color: "#fff",
-    textDecoration: "none",
-    borderRadius: "4px",
-    fontSize: "14px",
-    minWidth: "100px",
-    height: "40px",
-    backgroundRepeat: "no-repeat",
-    backgroundPosition: "center left",
-    backgroundSize: "24px 24px",
-    paddingLeft: "36px", // leave room for the provider logo
-    transition: "background-color 0.2s",
-  },
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "0.5rem 1rem",
+  backgroundColor: "#222",
+  color: "#fff",
+  textDecoration: "none",
+  borderRadius: "4px",
+  fontSize: "14px",
+  minWidth: "100px",
+  height: "40px",
+  backgroundRepeat: "no-repeat",
+  backgroundPosition: "center left",
+  backgroundSize: "24px 24px",
+  paddingLeft: "14px",
+  transition: "background-color 0.2s",
+},
+
 
 
   // ────────────────────────────────────────────────────────────────────────────
