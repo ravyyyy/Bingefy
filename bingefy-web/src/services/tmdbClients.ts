@@ -259,3 +259,43 @@ export async function getSeasonDetails(
   }
   return (await response.json()) as SeasonDetail;
 }
+
+export type WatchProvidersResponse = {
+  // This mirrors TMDB’s /tv/{tv_id}/watch/providers response.
+  // We’ll only type the parts we need (e.g. “results” mapping by region).
+  results: {
+    [countryCode: string]: {
+      link: string; // e.g. “https://www.themoviedb.org/tv/…/watch?…” 
+      flatrate?: Array<{
+        logo_path: string;
+        provider_id: number;
+        provider_name: string;
+      }>;
+      rent?: Array<{
+        logo_path: string;
+        provider_id: number;
+        provider_name: string;
+      }>;
+      buy?: Array<{
+        logo_path: string;
+        provider_id: number;
+        provider_name: string;
+      }>;
+    };
+  };
+};
+
+/**
+ * Fetches “where to watch” (streaming/FLATRATE/rent/buy) for a TV show.
+ * 
+ * @param showId  TMDB show ID (same one you pass into getTVShowDetails)
+ * @returns       Full JSON object; you can pick a specific country’s section.
+ */
+export async function getTVWatchProviders(
+  showId: number
+): Promise<WatchProvidersResponse> {
+  const url = `${BASE_URL}/tv/${showId}/watch/providers?api_key=${API_KEY}`;
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error("Failed to fetch watch‐provider data");
+  return (await resp.json()) as WatchProvidersResponse;
+}

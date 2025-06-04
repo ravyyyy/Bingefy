@@ -14,6 +14,7 @@ import {
   type SeasonDetail,
 } from "../services/tmdbClients";
 import type { DocumentData } from "firebase/firestore";
+import { getTVWatchProviders, type WatchProvidersResponse } from "../services/tmdbClients";
 
 const POSTER_BASE_URL = "https://image.tmdb.org/t/p/w300"; // larger size for episode stills
 
@@ -195,6 +196,38 @@ export default function ShowsPage() {
   const historyContainerRef = useRef<HTMLDivElement>(null);
   const prevHistoryHeightRef = useRef<number>(0);
   const [historyInitialized, setHistoryInitialized] = useState(false);
+
+   // ───── New: store watch‐provider data for the currently open show ─────
+  const [modalProviders, setModalProviders] = useState<
+    Array<{ provider_name: string; logo_path: string; provider_id: number }> 
+  >([]);
+
+  // Optionally, store the “link” (same for every provider) to the TMDB watch page for this show:
+  const [modalProvidersLink, setModalProvidersLink] = useState<string>("");
+
+    // ─────────────────────────────────────────────────────────────────────────────
+  // Hold the user’s country code (derived from IP) in state
+  // ─────────────────────────────────────────────────────────────────────────────
+  const [geoCountry, setGeoCountry] = useState<string>("");
+
+    // ─────────────────────────────────────────────────────────────────────────────
+  // On mount: fetch geolocation (country code) based on IP
+  // ─────────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      try {
+        const resp = await fetch("https://ipapi.co/json/");
+        if (!resp.ok) throw new Error("Failed geo-IP lookup");
+        const data: { country_code?: string } = await resp.json();
+        if (data.country_code) {
+          setGeoCountry(data.country_code.toUpperCase());
+        }
+      } catch (err) {
+        console.warn("Could not determine geo-IP country:", err);
+        // If it fails, geoCountry remains ""
+      }
+    })();
+  }, []);
 
   useEffect(() => {
   // Whenever we switch _into_ the “Watch List” tab (activeTab === 0),
@@ -445,6 +478,70 @@ export default function ShowsPage() {
       }
     })();
   }, [onboardedIds]);
+
+    // ────── Whenever `modalEpisode` or `geoCountry` changes, fetch providers ──────
+  useEffect(() => {
+    if (!modalEpisode) {
+      setModalProviders([]);
+      setModalProvidersLink("");
+      return;
+    }
+
+    (async () => {
+      try {
+        // 1) Fetch the TMDB “where to watch” data for this show:
+        const data: WatchProvidersResponse = await getTVWatchProviders(
+          modalEpisode.showId
+        );
+
+        // ─── Determine countryCode dynamically ───
+        let countryCode = "US"; // Default fallback
+
+        // 2a) If geoCountry (from IP) is set, use that:
+        if (geoCountry && geoCountry.length === 2) {
+          countryCode = geoCountry;
+        } else {
+          // 2b) Otherwise, derive from browser locale, e.g. "en-RO" → "RO"
+          try {
+            const lang = navigator.language || "";
+            if (lang.includes("-")) {
+              countryCode = lang.split("-")[1].toUpperCase();
+            }
+          } catch {
+            // keep "US"
+          }
+        }
+
+        // 3) Look up that region inside TMDB’s response:
+        const countryData = data.results[countryCode];
+        if (!countryData) {
+          // No providers for this region → clear state
+          setModalProviders([]);
+          setModalProvidersLink("");
+          return;
+        }
+
+        // 4) Grab “flatrate” (subscription) list:
+        const flatrateList = countryData.flatrate || [];
+
+        // 5) Save TMDB’s universal “where to watch” link:
+        setModalProvidersLink(countryData.link);
+
+        // 6) Map only the fields we need:
+        setModalProviders(
+          flatrateList.map((p) => ({
+            provider_id: p.provider_id,
+            provider_name: p.provider_name,
+            logo_path: p.logo_path,
+          }))
+        );
+      } catch (err) {
+        console.error("Error fetching watch providers:", err);
+        setModalProviders([]);
+        setModalProvidersLink("");
+      }
+    })();
+  }, [modalEpisode, geoCountry]);
 
   // ─────────────────────────────────────────────────────────────
 // 4) Build “Watched History” list (sorted by watchedAt descending)
@@ -986,10 +1083,34 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
               </div>
             </div>
 
-            {/* ─────────── “Where to Watch” Placeholder ─────────── */}
+                        {/* ─────────── “Where to Watch” Section ─────────── */}
             <div style={styles.modalWhereToWatchSection}>
               <h3 style={styles.modalWhereToWatchHeader}>Where to watch</h3>
-              <button style={styles.modalNetflixButton}>NETFLIX</button>
+
+              {modalProviders.length > 0 ? (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                  {modalProviders.map((prov) => (
+                    <a
+                      key={prov.provider_id}
+                      href={modalProvidersLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        ...styles.modalProviderButton,
+                        backgroundImage: prov.logo_path
+                          ? `url(https://image.tmdb.org/t/p/original${prov.logo_path})`
+                          : undefined,
+                      }}
+                    >
+                      {prov.provider_name}
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <p style={{ color: "#aaa", fontSize: "14px" }}>
+                  No streaming providers found in your region.
+                </p>
+              )}
             </div>
 
             {/* ─────────── Episode Info Section ─────────── */}
@@ -1448,6 +1569,28 @@ tabButtonActive: {
     fontSize: "0.9rem",
     cursor: "pointer",
   },
+    // ────────────────────────────────────────────────────────────────────────────
+  // Provider‐button style (each streaming‐service “pill”)
+  // ────────────────────────────────────────────────────────────────────────────
+  modalProviderButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "0.5rem 1rem",
+    backgroundColor: "#222",
+    color: "#fff",
+    textDecoration: "none",
+    borderRadius: "4px",
+    fontSize: "14px",
+    minWidth: "100px",
+    height: "40px",
+    backgroundRepeat: "no-repeat",
+    backgroundPosition: "center left",
+    backgroundSize: "24px 24px",
+    paddingLeft: "36px", // leave room for the provider logo
+    transition: "background-color 0.2s",
+  },
+
 
   // ────────────────────────────────────────────────────────────────────────────
   // Episode Info row: Air date / “Not watched” or watched date / Rating / ✓ button
