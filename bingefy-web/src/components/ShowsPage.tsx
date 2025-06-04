@@ -190,7 +190,7 @@ export default function ShowsPage() {
   const [onboardedIds, setOnboardedIds] = useState<number[]>([]);
 
   // Mapping: showId → array of WatchedEntry
-  const [episodesWatchedMap, setEpisodesWatchedMap] = useState< Record<number, WatchedEntry[]> >({});
+  const [episodesWatchedMap, setEpisodesWatchedMap] = useState<Record<number, WatchedEntry[]>>({});
 
   // Three lists for the “Watch List” tab
   const [watchNextList, setWatchNextList] = useState<EpisodeInfo[]>([]);
@@ -233,7 +233,7 @@ export default function ShowsPage() {
 
   // ─────────── Required for modal functionality ───────────
   const [seasonEpisodes, setSeasonEpisodes] = useState<number[]>([]);
-  const [modalProviders, setModalProviders] = useState< Array<{ provider_name: string; logo_path: string; provider_id: number }> >([]);
+  const [modalProviders, setModalProviders] = useState<Array<{ provider_name: string; logo_path: string; provider_id: number }>>([]);
   const [modalProvidersLink, setModalProvidersLink] = useState<string>("");
 
   // Modal state: the episode clicked on (null = no modal open)
@@ -296,8 +296,7 @@ export default function ShowsPage() {
         setOnboardedIds(ids);
 
         // episodesWatched: { showId: WatchedEntry[] }
-        const rawWatched: Record<string, WatchedEntry[]> =
-          data.episodesWatched || {};
+        const rawWatched: Record<string, WatchedEntry[]> = data.episodesWatched || {};
         const watchedMap: Record<number, WatchedEntry[]> = {};
         Object.keys(rawWatched).forEach((key) => {
           watchedMap[Number(key)] = rawWatched[key];
@@ -556,7 +555,7 @@ export default function ShowsPage() {
           })
         );
 
-        // Sort in DESCENDING order by air_date (newest first)
+        // Sort in **DESCENDING** order by air_date (newest first)
         allPast.sort(
           (a, b) =>
             new Date(b.air_date).getTime() - new Date(a.air_date).getTime()
@@ -573,6 +572,7 @@ export default function ShowsPage() {
   // After “pastEpisodes” first populates & Tab 1 is active,
   // scroll down by pastContainerRef height so “Upcoming” is visible.
   // ─────────────────────────────────────────────────────────────
+  const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (
       activeTab === 1 &&
@@ -580,6 +580,8 @@ export default function ShowsPage() {
       pastContainerRef.current !== null &&
       scrollRef.current !== null
     ) {
+      // Scroll to the bottom of “pastContainerRef” on first load,
+      // so that the very newest past episode is in view
       scrollRef.current.scrollTop = pastContainerRef.current.offsetHeight;
       setPastInitialized(true);
     }
@@ -721,7 +723,6 @@ export default function ShowsPage() {
   //    scroll down by historyContainerRef height so “Watch Next”
   //    sits at the top.
   // ─────────────────────────────────────────────────────────────
-  const scrollRef = useRef<HTMLDivElement>(null);
   const lastScrollTop = useRef(0);
   useEffect(() => {
     if (
@@ -1003,17 +1004,13 @@ export default function ShowsPage() {
       <nav style={topNavStyles.container}>
         <button
           onClick={() => setActiveTab(0)}
-          style={
-            activeTab === 0 ? topNavStyles.activeTab : topNavStyles.tab
-          }
+          style={activeTab === 0 ? topNavStyles.activeTab : topNavStyles.tab}
         >
           <span style={topNavStyles.label}>Watch List</span>
         </button>
         <button
           onClick={() => setActiveTab(1)}
-          style={
-            activeTab === 1 ? topNavStyles.activeTab : topNavStyles.tab
-          }
+          style={activeTab === 1 ? topNavStyles.activeTab : topNavStyles.tab}
         >
           <span style={topNavStyles.label}>Upcoming</span>
         </button>
@@ -1096,9 +1093,17 @@ export default function ShowsPage() {
             ) : (
               <div ref={pastContainerRef}>
                 {(() => {
-                  // Group the first `pastCount` episodes by exact “MMM DD, YYYY”
+                  // ───── UPDATED LOGIC ─────
+                  // 1) Take the top `pastCount` episodes (they are already sorted newest→oldest)
+                  const visibleWindow = pastEpisodes.slice(0, pastCount);
+
+                  // 2) Reverse them so the oldest of those `pastCount` is first in the DOM
+                  //    and the newest of those `pastCount` is last in the DOM.
+                  const reversedWindow = [...visibleWindow].reverse();
+
+                  // 3) Group by date (ascending date order) so oldest‐date group appears first
                   const groupedPast: Record<string, EpisodeInfo[]> = {};
-                  pastEpisodes.slice(0, pastCount).forEach((epi) => {
+                  reversedWindow.forEach((epi) => {
                     const dateLabel = formatPrettyDate(epi.air_date);
                     if (!groupedPast[dateLabel]) {
                       groupedPast[dateLabel] = [];
@@ -1106,14 +1111,15 @@ export default function ShowsPage() {
                     groupedPast[dateLabel].push(epi);
                   });
 
-                  // Sort those date-keys in descending order so newest date appears first
-                  const dateKeysDesc = Object.keys(groupedPast).sort((a, b) => {
+                  // 4) Sort the date keys in ascending order (oldest date first, newest last)
+                  const dateKeysAsc = Object.keys(groupedPast).sort((a, b) => {
                     const da = new Date(a);
                     const db = new Date(b);
-                    return db.getTime() - da.getTime();
+                    return da.getTime() - db.getTime();
                   });
 
-                  return dateKeysDesc.map((dateLabel) => (
+                  // 5) Render in that ascending‐by‐date order
+                  return dateKeysAsc.map((dateLabel) => (
                     <div key={dateLabel} style={styles.section}>
                       <div style={styles.sectionBadge}>
                         <span style={styles.sectionBadgeText}>{dateLabel}</span>
@@ -1163,7 +1169,7 @@ export default function ShowsPage() {
                                   marginTop: "4px",
                                 }}
                               >
-                                Aired: {formatPrettyDate(epi.air_date)} • Provider: —
+                                Aired: {formatPrettyDate(epi.air_date)} &bull; Provider: —
                               </p>
                             </div>
                           </div>
