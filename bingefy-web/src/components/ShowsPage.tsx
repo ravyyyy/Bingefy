@@ -1157,7 +1157,7 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
               {/* ─── Air Date / “Not watched”~“Watched on” / Rating / ✓ button ─── */}
               <div style={styles.modalAirRatingRow}>
   {/* ─── Calendar icon + formatted air date ─── */}
-  <Calendar size={16} color="#bbb" style={{ marginRight: "4px" }} />
+  <Calendar size={16} color="#bbb" style={{ marginRight: "-3px" }} />
   <span style={styles.modalAirDateText}>
     {modalEpisode.air_date
       ? formatPrettyDate(modalEpisode.air_date)
@@ -1172,23 +1172,30 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
         we.season === modalEpisode.season &&
         we.episode === modalEpisode.episode
     );
-    if (match) {
-      return (
-        <>
-          <Eye size={16} color="#ff6666" style={{ marginLeft: "1rem", marginRight: "4px" }} />
-          <span style={styles.notWatchedOrDate}>
-            {formatPrettyDate(match.watchedAt.split("T")[0])}
-          </span>
-        </>
-      );
-    } else {
-      return (
-        <>
-          <Eye size={16} color="#ff6666" style={{ marginLeft: "1rem", marginRight: "4px" }} />
-          <span style={styles.notWatchedOrDate}>Not watched</span>
-        </>
-      );
-    }
+
+    // If watched, eye icon is green; if not, eye icon is red.
+    const eyeColor = match ? "#28a745" : "#ff6666";
+
+    return (
+      <>
+        <Eye
+          size={16}
+          color={eyeColor}
+          style={{ marginLeft: "0.5rem", marginRight: "1px" }}
+        />
+        <span
+          style={
+            match
+              ? { ...styles.notWatchedOrDate, color: "#28a745" }
+              : styles.notWatchedOrDate
+          }
+        >
+          {match
+            ? formatPrettyDate(match.watchedAt.split("T")[0])
+            : "Not watched"}
+        </span>
+      </>
+    );
   })()}
 
   {/* ─── Rating percentage ─── */}
@@ -1678,7 +1685,7 @@ tabButtonActive: {
   notWatchedOrDate: {
     fontSize: "0.9rem",
     color: "#ff6666", // red if “Not watched”
-    margin: 0,
+    margin: -3,
   },
   modalAirDate: {
     fontSize: "0.9rem",
