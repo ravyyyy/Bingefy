@@ -278,7 +278,7 @@ export default function ShowsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const resp = await fetch("https://ipapi.co/json/");
+        const resp = await fetch("https://ipwhois.app/json/");
         if (!resp.ok) throw new Error("Failed geo-IP lookup");
         const data: { country_code?: string } = await resp.json();
         if (data.country_code) {
