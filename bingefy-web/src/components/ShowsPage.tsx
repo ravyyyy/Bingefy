@@ -492,6 +492,9 @@ export default function ShowsPage() {
   const [pastEpisodes, setPastEpisodes] = useState<EpisodeInfo[]>([]);
   const [pastCount, setPastCount] = useState(5);
 
+  // ───── UPDATED: add a ref to store the scrollTop before loading more ─────
+  const prevScrollTopRef = useRef<number>(0);
+
   // Refs & state for scroll‐preserve in “Past Episodes”
   const pastContainerRef = useRef<HTMLDivElement>(null);
   const prevPastHeightRef = useRef<number>(0);
@@ -588,10 +591,7 @@ export default function ShowsPage() {
   }, [pastEpisodes, pastInitialized, activeTab]);
 
   // ─────────────────────────────────────────────────────────────
-  // When pastCount increases (i.e. we load 5 more episodes),
-  // compute new height of pastContainerRef, subtract previous height,
-  // and add that delta to scrollRef.scrollTop—so the scroll “sticks”
-  // at the same episode. (Just like Watch History logic.)
+  // When pastCount increases, preserve scroll position exactly
   // ─────────────────────────────────────────────────────────────
   useLayoutEffect(() => {
     if (
@@ -599,9 +599,12 @@ export default function ShowsPage() {
       pastContainerRef.current !== null &&
       scrollRef.current !== null
     ) {
+      // Compute how much new height was added
       const newHeight = pastContainerRef.current.scrollHeight;
-      const delta = newHeight - prevPastHeightRef.current;
-      scrollRef.current.scrollTop += delta;
+      const addedHeight = newHeight - prevPastHeightRef.current;
+
+      // Reset scrollTop so user sees exactly where they were
+      scrollRef.current.scrollTop = prevScrollTopRef.current + addedHeight;
     }
   }, [pastCount, pastInitialized]);
 
@@ -966,8 +969,12 @@ export default function ShowsPage() {
     // and there are more to show, bump pastCount by 5
     if (curr < 50 && lastScrollTop.current > curr) {
       if (pastCount < pastEpisodes.length) {
-        if (pastContainerRef.current) {
+        if (pastContainerRef.current && scrollRef.current) {
           prevPastHeightRef.current = pastContainerRef.current.scrollHeight;
+          // ─────────────────────────── UPDATED ───────────────────────────
+          // Capture current scrollTop before new episodes get added:
+          prevScrollTopRef.current = scrollRef.current.scrollTop;
+          // ────────────────────────────────────────────────────────────────
         }
         setPastCount((prev) => prev + 5);
       }
@@ -1093,15 +1100,12 @@ export default function ShowsPage() {
             ) : (
               <div ref={pastContainerRef}>
                 {(() => {
-                  // ───── UPDATED LOGIC ─────
-                  // 1) Take the top `pastCount` episodes (they are already sorted newest→oldest)
+                  // ───── UPDATED: build the visible slice in descending-date order,
+                  // then reverse so that the oldest of those appears first in the DOM.
                   const visibleWindow = pastEpisodes.slice(0, pastCount);
-
-                  // 2) Reverse them so the oldest of those `pastCount` is first in the DOM
-                  //    and the newest of those `pastCount` is last in the DOM.
                   const reversedWindow = [...visibleWindow].reverse();
 
-                  // 3) Group by date (ascending date order) so oldest‐date group appears first
+                  // Group by date ascending
                   const groupedPast: Record<string, EpisodeInfo[]> = {};
                   reversedWindow.forEach((epi) => {
                     const dateLabel = formatPrettyDate(epi.air_date);
@@ -1111,14 +1115,13 @@ export default function ShowsPage() {
                     groupedPast[dateLabel].push(epi);
                   });
 
-                  // 4) Sort the date keys in ascending order (oldest date first, newest last)
+                  // Sort date keys ascending (oldest date first)
                   const dateKeysAsc = Object.keys(groupedPast).sort((a, b) => {
                     const da = new Date(a);
                     const db = new Date(b);
                     return da.getTime() - db.getTime();
                   });
 
-                  // 5) Render in that ascending‐by‐date order
                   return dateKeysAsc.map((dateLabel) => (
                     <div key={dateLabel} style={styles.section}>
                       <div style={styles.sectionBadge}>
