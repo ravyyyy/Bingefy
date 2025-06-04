@@ -1460,8 +1460,22 @@ export default function ShowsPage() {
                          }}
                          onClick={() => setModalEpisode(epi)}
                        >
-                         {/* Optional: still show a small placeholder icon or leave blank */}
-                         <div style={{ width: "40px", marginRight: "0.75rem" }} />
+                         {/* Show the episode's still if it exists (otherwise leave a blank placeholder) */}
+       {epi.still_path ? (
+         <img
+           src={`${STILL_BASE_URL}${epi.still_path}`}
+           alt={`${epi.showName} S${epi.season}E${epi.episode}`}
+           style={{
+             width: "60px",
+             height: "90px",
+             objectFit: "cover",
+             borderRadius: "4px",
+             marginRight: "0.75rem",
+           }}
+         />
+       ) : (
+         <div style={{ width: "60px", height: "90px", marginRight: "0.75rem" }} />
+       )}
 
                          <div style={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
                            <span style={styles.epiLabel}>
