@@ -107,6 +107,20 @@ function formatPrettyDate(isoDateString: string): string {
   });
 }
 
+/**
+ * Given an ISO date string (“YYYY-MM-DD”), return how many full days from today.
+ * If it’s the same day, this returns 0. If it’s in the future, it returns 1, 2, …
+ */
+function daysUntil(isoDate: string): number {
+  const today = new Date();
+  // Zero out time so we compare just YYYY-MM-DD
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(isoDate);
+  target.setHours(0, 0, 0, 0);
+  const msPerDay = 1000 * 60 * 60 * 24;
+  return Math.round((target.getTime() - today.getTime()) / msPerDay);
+}
+
 // Helper: map a 0–10 vote_average to a hex‐color
 function ratingColor(voteAverage: number): string {
   const pct = voteAverage * 10; // convert to 0–100 scale
@@ -182,6 +196,14 @@ async function findFirstUnwatchedEpisode(
 
 export default function ShowsPage() {
   const { user } = useAuth();
+
+  // ─────────────────────────────────────────────────────────────
+  // Which (day + show) groups are currently “open” (expanded)?
+  // We’ll store keys like “Monday-12345” (weekday + showId).
+  // ─────────────────────────────────────────────────────────────
+  const [expandedUpcomingGroups, setExpandedUpcomingGroups] = useState<Set<string>>(
+    new Set()
+  );
 
   // 0 = “Watch List” tab, 1 = “Upcoming” tab
   const [activeTab, setActiveTab] = useState<0 | 1>(0);
@@ -1203,75 +1225,158 @@ export default function ShowsPage() {
         {activeTab === 1 && (
           <>
             {Object.keys(groupedUpcoming).length === 0 ? (
-              <p style={styles.emptyText}>No upcoming episodes.</p>
-            ) : (
-              WEEKDAY_ORDER.map((day) => {
-                const group = groupedUpcoming[day];
-                if (!group || group.length === 0) return null;
-                return (
-                  <div key={day} style={styles.section}>
-                    <div style={styles.sectionBadge}>
-                      <span style={styles.sectionBadgeText}>{day}</span>
-                    </div>
-                    {group.map((epi) => {
-                      const epiKey = `${epi.showId}-${epi.season}-${epi.episode}-upcoming`;
-                      return (
-                        <div
-                          key={epiKey}
-                          style={{
-                            ...styles.epiCard,
-                            cursor: "pointer",
-                            padding: "1rem",
-                            backgroundColor: "#181818",
-                            marginBottom: "0.5rem",
-                          }}
-                          onClick={() => setModalEpisode(epi)}
-                        >
-                          {/* Show the poster for upcoming */}
-                          {epi.poster_path ? (
-                            <img
-                              src={`${POSTER_BASE_URL}${epi.poster_path}`}
-                              alt={epi.showName}
-                              style={{
-                                width: "80px",
-                                height: "120px",
-                                objectFit: "cover",
-                                borderRadius: "4px",
-                                marginRight: "1rem",
-                              }}
-                            />
-                          ) : (
-                            <div style={styles.noImage}>No Image</div>
-                          )}
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              flexGrow: 1,
-                            }}
-                          >
-                            <span style={styles.showName}>{epi.showName}</span>
-                            <span style={styles.epiLabel}>{`S${epi.season} | E${epi.episode}`}</span>
-                            {epi.episodeTitle && (
-                              <span style={styles.epiTitle}>{epi.episodeTitle}</span>
-                            )}
-                            <span
-                              style={{
-                                ...styles.epiOverview,
-                                marginTop: "0.25rem",
-                                color: "#ccc",
-                              }}
-                            >
-                              {formatPrettyDate(epi.air_date)}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })
-            )}
+     <p style={styles.emptyText}>No upcoming episodes.</p>
+   ) : (
+     WEEKDAY_ORDER.map((day) => {
+       const dayGroup = groupedUpcoming[day];
+       if (!dayGroup || dayGroup.length === 0) return null;
+
+       // ─── Step A: Group all episodes under this `day` by showId ───
+       const byShow: Record<number, EpisodeInfo[]> = {};
+       dayGroup.forEach((epi) => {
+         if (!byShow[epi.showId]) byShow[epi.showId] = [];
+         byShow[epi.showId].push(epi);
+       });
+
+       return (
+         <div key={day} style={styles.section}>
+           <div style={styles.sectionBadge}>
+             <span style={styles.sectionBadgeText}>{day}</span>
+           </div>
+
+           {/*
+             Step B: For each show that has ≥1 episode on this day,
+             render a single “header row” that shows:
+             - The show’s poster
+             - The show name
+             - “N episodes” (count of episodes in this group)
+             - Days until air (they all share the same date, so we can use epi.air_date of the first)
+             And an arrow to expand/collapse.
+           */}
+           {Object.entries(byShow).map(([showIdStr, episodesArr]) => {
+             const showId = Number(showIdStr);
+             // We’ll use the first EpisodeInfo just to grab poster + date + showName
+             const firstEpi = episodesArr[0];
+
+             // Build a unique key: `${day}-${showId}`. Will live in expandedUpcomingGroups.
+             const groupKey = `${day}-${showId}`;
+             const isOpen = expandedUpcomingGroups.has(groupKey);
+
+             // Calculate “days until air” from that shared date:
+             const daysLeft = daysUntil(firstEpi.air_date);
+
+             return (
+               <React.Fragment key={groupKey}>
+                 {/*** Collapsed header for this show’s group ***/}
+                 <div
+                   style={{
+                     ...styles.epiCard,
+                     backgroundColor: "#181818",
+                     padding: "1rem",
+                     marginBottom: "0.25rem",
+                     display: "flex",
+                     alignItems: "center",
+                     cursor: "pointer",
+                   }}
+                   onClick={() => {
+                     const copy = new Set(expandedUpcomingGroups);
+                     if (isOpen) copy.delete(groupKey);
+                     else copy.add(groupKey);
+                     setExpandedUpcomingGroups(copy);
+                   }}
+                 >
+                   {/* Show the poster of the first episode as the group icon */}
+                   {firstEpi.poster_path ? (
+                     <img
+                       src={`${POSTER_BASE_URL}${firstEpi.poster_path}`}
+                       alt={firstEpi.showName}
+                       style={{
+                         width: "60px",
+                         height: "90px",
+                         objectFit: "cover",
+                         borderRadius: "4px",
+                         marginRight: "1rem",
+                       }}
+                     />
+                   ) : (
+                     <div style={{ ...styles.noImage, width: "60px", height: "90px" }}>
+                       No Image
+                     </div>
+                   )}
+
+                   <div style={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
+                     <span style={styles.showName}>{firstEpi.showName}</span>
+                     <span style={styles.epiLabel}>
+                       {episodesArr.length} episode{episodesArr.length > 1 ? "s" : ""}
+                     </span>
+                   </div>
+
+                   {/*** “Days left” badge on the right ***/}
+                   <div
+                     style={{
+                       display: "flex",
+                       flexDirection: "column",
+                       alignItems: "flex-end",
+                       marginRight: "1rem",
+                     }}
+                   >
+                     <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "#fff" }}>
+                       {daysLeft} DAYS
+                     </span>
+                     <span style={{ fontSize: "0.7rem", color: "#aaa" }}>until air</span>
+                   </div>
+
+                   {/*** Expand/collapse arrow ***/}
+                   <div style={{ fontSize: "1.2rem", color: "#888" }}>
+                     {isOpen ? "▾" : "▸"}
+                   </div>
+                 </div>
+
+                 {/*** If open, render each episode individually ***/}
+                 {isOpen &&
+                   episodesArr.map((epi) => {
+                     const epiKey = `${epi.showId}-${epi.season}-${epi.episode}-upcoming`;
+                     const epiDays = daysUntil(epi.air_date);
+                     return (
+                       <div
+                         key={epiKey}
+                         style={{
+                           ...styles.epiCard,
+                           backgroundColor: "#202020",
+                           padding: "0.75rem",
+                           marginBottom: "0.25rem",
+                           marginLeft: "72px", // indent under the group’s poster
+                           display: "flex",
+                           alignItems: "center",
+                         }}
+                         onClick={() => setModalEpisode(epi)}
+                       >
+                         {/* Optional: still show a small placeholder icon or leave blank */}
+                         <div style={{ width: "40px", marginRight: "0.75rem" }} />
+
+                         <div style={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
+                           <span style={styles.epiLabel}>
+                             S{epi.season} | E{epi.episode}
+                           </span>
+                           {epi.episodeTitle && (
+                             <span style={styles.epiTitle}>{epi.episodeTitle}</span>
+                           )}
+                         </div>
+
+                         {/*** “Days left” on the right ***/}
+                         <span style={{ fontSize: "0.85rem", fontWeight: 500, color: "#fff" }}>
+                           {epiDays} DAYS
+                         </span>
+                       </div>
+                     );
+                   })}
+               </React.Fragment>
+             );
+           })}
+         </div>
+       );
+     })
+   )}
           </>
         )}
 
