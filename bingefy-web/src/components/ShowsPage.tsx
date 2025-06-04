@@ -603,7 +603,7 @@ export default function ShowsPage() {
       const newHeight = pastContainerRef.current.scrollHeight;
       const addedHeight = newHeight - prevPastHeightRef.current;
 
-      // Reset scrollTop so user sees exactly where they were
+      // Restore exactly where the user was
       scrollRef.current.scrollTop = prevScrollTopRef.current + addedHeight;
     }
   }, [pastCount, pastInitialized]);
@@ -1091,10 +1091,6 @@ export default function ShowsPage() {
         {/* ─────────── “Past Episodes” (lazy-loaded above Upcoming) ─────────── */}
         {activeTab === 1 && (
           <div style={{ marginBottom: "2rem" }}>
-            <div style={styles.sectionBadge}>
-              <span style={styles.sectionBadgeText}>PAST EPISODES</span>
-            </div>
-
             {pastEpisodes.length === 0 ? (
               <p style={styles.emptyText}>No past episodes yet.</p>
             ) : (
@@ -1124,6 +1120,7 @@ export default function ShowsPage() {
 
                   return dateKeysAsc.map((dateLabel) => (
                     <div key={dateLabel} style={styles.section}>
+                      {/* ─── Removed the floating “PAST EPISODES” badge here ─── */}
                       <div style={styles.sectionBadge}>
                         <span style={styles.sectionBadgeText}>{dateLabel}</span>
                       </div>
@@ -1165,15 +1162,7 @@ export default function ShowsPage() {
                                   {epi.episodeOverview}
                                 </p>
                               )}
-                              <p
-                                style={{
-                                  color: "#888",
-                                  fontSize: "0.8rem",
-                                  marginTop: "4px",
-                                }}
-                              >
-                                Aired: {formatPrettyDate(epi.air_date)} &bull; Provider: —
-                              </p>
+                              {/* ─── Removed the “Aired: … • Provider: …” line here ─── */}
                             </div>
                           </div>
                         );
@@ -1184,11 +1173,7 @@ export default function ShowsPage() {
               </div>
             )}
 
-            {pastCount < pastEpisodes.length && (
-              <p style={{ textAlign: "center", color: "#888", marginTop: "1rem" }}>
-                Scroll up to load more…
-              </p>
-            )}
+            {/* ─── Removed the “Scroll up to load more…” message entirely ─── */}
           </div>
         )}
 
