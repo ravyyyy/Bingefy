@@ -1976,7 +1976,6 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 
   sectionBadge: {
-    position: "sticky",
     top: 0,
     display: "flex",
     justifyContent: "center",
