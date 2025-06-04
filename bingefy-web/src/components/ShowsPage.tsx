@@ -17,6 +17,8 @@ import type { DocumentData } from "firebase/firestore";
 import { getTVWatchProviders, type WatchProvidersResponse } from "../services/tmdbClients";
 
 const POSTER_BASE_URL = "https://image.tmdb.org/t/p/w300"; // larger size for episode stills
+// small/w300 is fine for lists, but we want bigger for the modal
+const STILL_BASE_URL = "https://image.tmdb.org/t/p/original";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shape of a “watched” entry in Firestore
@@ -1063,7 +1065,7 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
             <div style={styles.modalImageWrapper}>
               {modalEpisode.still_path ? (
                 <img
-                  src={`${POSTER_BASE_URL}${modalEpisode.still_path}`}
+                  src={`${STILL_BASE_URL}${modalEpisode.still_path}`}
                   alt={modalEpisode.showName}
                   style={styles.modalStill}
                 />
