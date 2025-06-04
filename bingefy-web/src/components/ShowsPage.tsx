@@ -111,6 +111,19 @@ const topTabBarHeight = 64; // must match your main menu height
   });
 }
 
+// Helper: map a 0–10 vote_average to a hex‐color
+function ratingColor(voteAverage: number): string {
+  const pct = voteAverage * 10; // convert to 0–100 scale
+  if (pct >= 80) {
+    return "#28a745";   // bright green for “excellent” (≥ 8.0)
+  } else if (pct >= 60) {
+    return "#ffc107";   // amber/yellow for “good” (6.0–7.9)
+  } else if (pct >= 40) {
+    return "#fd7e14";   // orange for “okay” (4.0–5.9)
+  } else {
+    return "#dc3545";   // red for “poor” (< 4.0)
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper #1: Remove any duplicate (season,episode) and keep only the one
@@ -1199,7 +1212,7 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
   })()}
 
   {/* ─── Rating percentage ─── */}
-  <p style={styles.modalRatingPercent}>
+  <p style={{...styles.modalRatingPercent, color: ratingColor(modalEpisode.vote_average),}}>
     {Math.round(modalEpisode.vote_average * 10)}%
   </p>
 
