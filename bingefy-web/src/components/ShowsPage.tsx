@@ -97,6 +97,20 @@ const topTabBarHeight = 64; // must match your main menu height
     fontWeight: 500,
   },};
 
+  function formatPrettyDate(isoDateString: string): string {
+  // isoDateString is something like "2025-04-23".
+  const dateObj = new Date(isoDateString);
+  if (isNaN(dateObj.getTime())) return "Unknown";
+
+  // Options: e.g. "Apr 23, 2025"
+  return dateObj.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper #1: Remove any duplicate (season,episode) and keep only the one
 //            with the latest watchedAt timestamp. (Prevents “double counting.”)
@@ -1141,67 +1155,87 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
             <div style={styles.modalInfo}>
               {/* ─── Air Date / “Not watched”~“Watched on” / Rating / ✓ button ─── */}
               <div style={styles.modalAirRatingRow}>
-                <p style={styles.modalAirDate}>
-                  Air Date: {modalEpisode.air_date || "Unknown"}
-                </p>
-                {(() => {
-                  const watchedEntries =
-                    episodesWatchedMap[modalEpisode.showId] || [];
-                  const match = watchedEntries.find(
-                    (we) =>
-                      we.season === modalEpisode.season &&
-                      we.episode === modalEpisode.episode
-                  );
-                  const watchedTag = match
-                    ? `Watched on ${match.watchedAt.split("T")[0]}`
-                    : "Not watched";
-                  return (
-                    <p style={styles.notWatchedOrDate}>{watchedTag}</p>
-                  );
-                })()}
-                <p style={styles.modalRatingPercent}>
-                  {Math.round(modalEpisode.vote_average * 10)}%
-                </p>
+  {/* ───── Calendar icon + pretty date ───── */}
+  <span style={styles.modalIcon}>📅</span>
+  <span style={styles.modalAirDateText}>
+    {modalEpisode.air_date
+      ? formatPrettyDate(modalEpisode.air_date)
+      : "Unknown"}
+  </span>
 
-                {/* ✓ “Mark/Unmark as Watched” (always present) */}
-                {(() => {
-                  const watchedEntries =
-                    episodesWatchedMap[modalEpisode.showId] || [];
-                  const isAlready = watchedEntries.some(
-                    (we) =>
-                      we.season === modalEpisode.season &&
-                      we.episode === modalEpisode.episode
-                  );
-                  return (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!isAlready) {
-                          markAsWatched(modalEpisode);
-                        } else {
-                          const confirmUnwatch = window.confirm(
-                            "This episode is already marked as watched. Do you want to unwatch it?"
-                          );
-                          if (confirmUnwatch) {
-                            unmarkAsWatched(modalEpisode);
-                          }
-                        }
-                      }}
-                      style={
-                        isAlready
-                          ? {
-                            ...styles.cardWatchBtn,
-                            backgroundColor: "#28a745",
-                            color: "#ffffff",
-                          }
-                          : styles.cardWatchBtn
-                      }
-                    >
-                      ✓
-                    </button>
-                  );
-                })()}
-              </div>
+  {/* ───── Eye icon + watched status ───── */}
+  {(() => {
+    const watchedEntries = episodesWatchedMap[modalEpisode.showId] || [];
+    const match = watchedEntries.find(
+      (we) =>
+        we.season === modalEpisode.season &&
+        we.episode === modalEpisode.episode
+    );
+    if (match) {
+      // Already watched → show eye icon + watched-on date
+      return (
+        <>
+          <span style={styles.modalIcon}>👁️</span>
+          <span style={styles.notWatchedOrDate}>
+            {formatPrettyDate(match.watchedAt.split("T")[0])}
+          </span>
+        </>
+      );
+    } else {
+      // Not watched yet → eye icon + “Not watched”
+      return (
+        <>
+          <span style={styles.modalIcon}>👁️</span>
+          <span style={styles.notWatchedOrDate}>Not watched</span>
+        </>
+      );
+    }
+  })()}
+
+  {/* ───── Rating percentage ───── */}
+  <p style={styles.modalRatingPercent}>
+    {Math.round(modalEpisode.vote_average * 10)}%
+  </p>
+
+  {/* ───── “Mark as Watched” button (unchanged) ───── */}
+  {(() => {
+    const watchedEntries = episodesWatchedMap[modalEpisode.showId] || [];
+    const isAlready = watchedEntries.some(
+      (we) =>
+        we.season === modalEpisode.season &&
+        we.episode === modalEpisode.episode
+    );
+    return (
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!isAlready) {
+            markAsWatched(modalEpisode);
+          } else {
+            const confirmUnwatch = window.confirm(
+              "This episode is already marked as watched. Do you want to unwatch it?"
+            );
+            if (confirmUnwatch) {
+              unmarkAsWatched(modalEpisode);
+            }
+          }
+        }}
+        style={
+          isAlready
+            ? {
+                ...styles.cardWatchBtn,
+                backgroundColor: "#28a745",
+                color: "#ffffff",
+              }
+            : styles.cardWatchBtn
+        }
+      >
+        ✓
+      </button>
+    );
+  })()}
+</div>
+
 
               {/* Full Episode Overview */}
               {modalEpisode.episodeOverview && (
@@ -1630,18 +1664,32 @@ tabButtonActive: {
   modalAirRatingRow: {
     display: "flex",
     alignItems: "center",
-    gap: "1rem",
+    gap: "0.75rem",
     marginBottom: "1rem",
     position: "relative",
   },
-  modalAirDate: {
+  // Style for the calendar/eye icons so they’re aligned and not too big:
+  modalIcon: {
+    fontSize: "1rem",      // same as your text, or adjust slightly (e.g. 1.1rem)
+    lineHeight: 1,
+  },
+
+  // Air date text (same color as before, just no “Air Date:” prefix)
+  modalAirDateText: {
     fontSize: "0.9rem",
     color: "#bbb",
     margin: 0,
   },
+
+  // “Not watched” or watched date:
   notWatchedOrDate: {
     fontSize: "0.9rem",
-    color: "#ff6666",
+    color: "#ff6666", // red if “Not watched”
+    margin: 0,
+  },
+  modalAirDate: {
+    fontSize: "0.9rem",
+    color: "#bbb",
     margin: 0,
   },
   modalRatingPercent: {
