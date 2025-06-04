@@ -536,68 +536,68 @@ useEffect(() => {
   }, [onboardedIds]);
 
   // ────── Whenever `modalEpisode` or `geoCountry` changes, fetch providers ──────
-  useEffect(() => {
-    if (!modalEpisode) {
-      setModalProviders([]);
-      setModalProvidersLink("");
+useEffect(() => {
+  if (!modalEpisode) {
+    setModalProviders([]);
+    setModalProvidersLink("");
+    return;
+  }
+
+  const fetchProviders = async () => {
+    // 1) Decide countryCode from geoCountry (if set) or from browser locale
+    let countryCode: string | null = null;
+
+    // 1a) Use geoCountry if available and looks like "RO", "US", etc.
+    if (geoCountry && geoCountry.length === 2) {
+      countryCode = geoCountry;
+    } else {
+      // 1b) Otherwise, try to read navigator.language (e.g. "ro-RO" → "RO")
+      const lang = navigator.language || "";
+      if (lang.includes("-")) {
+        countryCode = lang.split("-")[1].toUpperCase();
+      }
+    }
+
+    // 1c) If we still don’t have a two‐letter code, bail out for now.
+    if (!countryCode) {
       return;
     }
 
-    (async () => {
-      try {
-        // 1) Fetch the TMDB “where to watch” data for this show:
-        const data: WatchProvidersResponse = await getTVWatchProviders(
-          modalEpisode.showId
-        );
+    // 2) Fetch TMDB “where to watch” for this show + region
+    try {
+      const data: WatchProvidersResponse = await getTVWatchProviders(
+        modalEpisode.showId
+      );
 
-        // ─── Determine countryCode dynamically ───
-        let countryCode = "US"; // Default fallback
-
-        // 2a) If geoCountry (from IP) is set, use that:
-        if (geoCountry && geoCountry.length === 2) {
-          countryCode = geoCountry;
-        } else {
-          // 2b) Otherwise, derive from browser locale, e.g. "en-RO" → "RO"
-          try {
-            const lang = navigator.language || "";
-            if (lang.includes("-")) {
-              countryCode = lang.split("-")[1].toUpperCase();
-            }
-          } catch {
-            // keep "US"
-          }
-        }
-
-        // 3) Look up that region inside TMDB’s response:
-        const countryData = data.results[countryCode];
-        if (!countryData) {
-          // No providers for this region → clear state
-          setModalProviders([]);
-          setModalProvidersLink("");
-          return;
-        }
-
-        // 4) Grab “flatrate” (subscription) list:
-        const flatrateList = countryData.flatrate || [];
-
-        // 5) Save TMDB’s universal “where to watch” link:
-        setModalProvidersLink(countryData.link);
-
-        // 6) Map only the fields we need:
-        setModalProviders(
-          flatrateList.map((p) => ({
-            provider_id: p.provider_id,
-            provider_name: p.provider_name,
-            logo_path: p.logo_path,
-          }))
-        );
-      } catch (err) {
-        console.error("Error fetching watch providers:", err);
+      // 3) Look up that region inside TMDB’s response
+      const countryData = data.results[countryCode];
+      if (!countryData) {
         setModalProviders([]);
         setModalProvidersLink("");
+        return;
       }
-    })();
-  }, [modalEpisode, geoCountry]);
+
+      // 4) Grab “flatrate” (subscription) list & TMDB’s universal link
+      const flatrateList = countryData.flatrate || [];
+      setModalProvidersLink(countryData.link);
+
+      // 5) Map only the fields we need
+      setModalProviders(
+        flatrateList.map((p) => ({
+          provider_id: p.provider_id,
+          provider_name: p.provider_name,
+          logo_path: p.logo_path,
+        }))
+      );
+    } catch (err) {
+      console.error("Error fetching watch providers:", err);
+      setModalProviders([]);
+      setModalProvidersLink("");
+    }
+  };
+
+  fetchProviders();
+}, [modalEpisode, geoCountry]);
 
   // ─────────────────────────────────────────────────────────────
   // 4) Build “Watched History” list (sorted by watchedAt descending)
