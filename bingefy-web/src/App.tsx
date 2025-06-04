@@ -88,45 +88,7 @@ function App() {
   }
 
   return (
-    <div
-      style={{
-        background: "#121212",
-        minHeight: "100vh",
-        paddingTop: hideHeader ? 0 : "1rem",
-      }}
-    >
-      {!hideHeader && (
-        <header style={headerStyles.container}>
-          <div style={headerStyles.logoContainer}>
-            <img
-              src={logoSrc}
-              alt="Bingefy Logo"
-              style={headerStyles.logoImage}
-            />
-          </div>
-          <nav style={headerStyles.nav}>
-            {user && user.emailVerified ? (
-              <>
-                <span style={headerStyles.welcome}>Hello, {username}</span>
-                <button onClick={logOut} style={headerStyles.logoutButton}>
-                  Sign Out
-                </button>
-              </>
-            ) : (
-              <>
-                <Link to="/login" style={headerStyles.link}>
-                  Login
-                </Link>
-                <Link to="/signup" style={headerStyles.link}>
-                  Sign Up
-                </Link>
-              </>
-            )}
-          </nav>
-        </header>
-      )}
-
-      <main style={{ height: hideHeader ? "100vh" : "auto" }}>
+          <main style={{ height: hideHeader ? "100vh" : "auto" }}>
         <Routes>
           {/* ─────── Public Routes ─────── */}
           <Route path="/signup" element={<SignUp />} />
@@ -171,7 +133,6 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
-    </div>
   );
 }
 
