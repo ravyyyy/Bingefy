@@ -48,57 +48,58 @@ interface EpisodeInfo {
 }
 
 const topTabBarHeight = 64; // must match your main menu height
- const topNavStyles = {
-   container: {
-     position: "fixed" as const,
-     top: 0,
-     left: 0,
-     width: "100%",
-     height: `${topTabBarHeight}px`,
-     backgroundColor: "#111",
-     borderBottom: "1px solid #333",
-     display: "flex",
-     justifyContent: "space-around",
-     alignItems: "center",
-     zIndex: 10,
-   },
-   tab: {
-     display: "flex",
-     flexDirection: "column" as const,
-     alignItems: "center",
-     justifyContent: "center",
-     color: "#888",
-     backgroundColor: "transparent",
-     border: "none",
-     textDecoration: "none",
-     fontSize: "14px",
-     gap: "4px",
-     width: "50%", // two tabs = 50% each
-     height: "100%",
-     transition: "color 0.2s",
-   },
-   activeTab: {
-     display: "flex",
-     flexDirection: "column" as const,
-     alignItems: "center",
-     justifyContent: "center",
-     color: "#fff",
-     backgroundColor: "transparent",
-     border: "none",
-     textDecoration: "none",
-     fontSize: "14px",
-     gap: "4px",
-     width: "50%",
-     height: "100%",
-     borderBottom: "3px solid #e50914",
-     transition: "color 0.2s, border-bottom 0.2s",
-   },
+const topNavStyles = {
+  container: {
+    position: "fixed" as const,
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: `${topTabBarHeight}px`,
+    backgroundColor: "#111",
+    borderBottom: "1px solid #333",
+    display: "flex",
+    justifyContent: "space-around",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  tab: {
+    display: "flex",
+    flexDirection: "column" as const,
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#888",
+    backgroundColor: "transparent",
+    border: "none",
+    textDecoration: "none",
+    fontSize: "14px",
+    gap: "4px",
+    width: "50%", // two tabs = 50% each
+    height: "100%",
+    transition: "color 0.2s",
+  },
+  activeTab: {
+    display: "flex",
+    flexDirection: "column" as const,
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#fff",
+    backgroundColor: "transparent",
+    border: "none",
+    textDecoration: "none",
+    fontSize: "14px",
+    gap: "4px",
+    width: "50%",
+    height: "100%",
+    borderBottom: "3px solid #e50914",
+    transition: "color 0.2s, border-bottom 0.2s",
+  },
   label: {
     fontSize: "14px",
     fontWeight: 500,
-  },};
+  },
+};
 
-  function formatPrettyDate(isoDateString: string): string {
+function formatPrettyDate(isoDateString: string): string {
   // isoDateString is something like "2025-04-23".
   const dateObj = new Date(isoDateString);
   if (isNaN(dateObj.getTime())) return "Unknown";
@@ -227,7 +228,7 @@ export default function ShowsPage() {
   const prevHistoryHeightRef = useRef<number>(0);
   const [historyInitialized, setHistoryInitialized] = useState(false);
 
-   // ───── New: store watch‐provider data for the currently open show ─────
+  // ───── New: store watch‐provider data for the currently open show ─────
   const [modalProviders, setModalProviders] = useState<
     Array<{ provider_name: string; logo_path: string; provider_id: number }> 
   >([]);
@@ -235,12 +236,12 @@ export default function ShowsPage() {
   // Optionally, store the “link” (same for every provider) to the TMDB watch page for this show:
   const [modalProvidersLink, setModalProvidersLink] = useState<string>("");
 
-    // ─────────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────────
   // Hold the user’s country code (derived from IP) in state
   // ─────────────────────────────────────────────────────────────────────────────
   const [geoCountry, setGeoCountry] = useState<string>("");
 
-    // ─────────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────────
   // On mount: fetch geolocation (country code) based on IP
   // ─────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -260,16 +261,14 @@ export default function ShowsPage() {
   }, []);
 
   useEffect(() => {
-  // Whenever we switch _into_ the “Watch List” tab (activeTab === 0),
-  // restore historyCount → 5 and historyInitialized → false so that
-  // it “feels fresh” exactly as on first load.
-  if (activeTab === 0) {
-    setHistoryCount(5);
-    setHistoryInitialized(false);
-  }
-}, [activeTab]);
-
-
+    // Whenever we switch _into_ the “Watch List” tab (activeTab === 0),
+    // restore historyCount → 5 and historyInitialized → false so that
+    // it “feels fresh” exactly as on first load.
+    if (activeTab === 0) {
+      setHistoryCount(5);
+      setHistoryInitialized(false);
+    }
+  }, [activeTab]);
 
   // One list for the “Upcoming” tab
   const [upcomingList, setUpcomingList] = useState<EpisodeInfo[]>([]);
@@ -372,7 +371,7 @@ export default function ShowsPage() {
             continue;
           }
 
-          // Otherwise, at least one watched entry exists.  Find the first truly unwatched:
+          // Otherwise, at least one watched entry exists. Find the first truly unwatched:
           const firstUnwatched = await findFirstUnwatchedEpisode(
             showId,
             uniqueEntries
@@ -509,7 +508,7 @@ export default function ShowsPage() {
     })();
   }, [onboardedIds]);
 
-    // ────── Whenever `modalEpisode` or `geoCountry` changes, fetch providers ──────
+  // ────── Whenever `modalEpisode` or `geoCountry` changes, fetch providers ──────
   useEffect(() => {
     if (!modalEpisode) {
       setModalProviders([]);
@@ -574,101 +573,101 @@ export default function ShowsPage() {
   }, [modalEpisode, geoCountry]);
 
   // ─────────────────────────────────────────────────────────────
-// 4) Build “Watched History” list (sorted by watchedAt descending)
-//    whenever episodesWatchedMap changes
-// ─────────────────────────────────────────────────────────────
-useEffect(() => {
-  const buildHistory = async () => {
-    // 1) Flatten all watched entries into one array
-    let entries: {
-      showId: number;
-      season: number;
-      episode: number;
-      watchedAt: string;
-    }[] = [];
+  // 4) Build “Watched History” list (sorted by watchedAt descending)
+  //    whenever episodesWatchedMap changes
+  // ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const buildHistory = async () => {
+      // 1) Flatten all watched entries into one array
+      let entries: {
+        showId: number;
+        season: number;
+        episode: number;
+        watchedAt: string;
+      }[] = [];
 
-    Object.entries(episodesWatchedMap).forEach(([showId, watchArr]) => {
-      watchArr.forEach((we) =>
-        entries.push({
-          showId: Number(showId),
-          season: we.season,
-          episode: we.episode,
-          watchedAt: we.watchedAt,
-        })
-      );
-    });
-
-    // 2) Sort descending by watchedAt
-    entries.sort(
-      (a, b) =>
-        new Date(b.watchedAt).getTime() - new Date(a.watchedAt).getTime()
-    );
-
-    // 3) Fetch details for each entry & build EpisodeInfo objects
-    const result: EpisodeInfo[] = [];
-    for (const { showId, season, episode, watchedAt } of entries) {
-      try {
-        const epDet: EpisodeDetail = await getEpisodeDetails(
-          showId,
-          season,
-          episode
+      Object.entries(episodesWatchedMap).forEach(([showId, watchArr]) => {
+        watchArr.forEach((we) =>
+          entries.push({
+            showId: Number(showId),
+            season: we.season,
+            episode: we.episode,
+            watchedAt: we.watchedAt,
+          })
         );
-        const showDet = await getTVShowDetails(showId);
+      });
 
-        result.push({
-          showId,
-          showName: showDet.name,
-          poster_path: showDet.poster_path,
-          season,
-          episode,
-          label: `Watched ${watchedAt.split("T")[0]}`,
-          episodeTitle: epDet.name,
-          episodeOverview: epDet.overview,
-          air_date: epDet.air_date,
-          still_path: epDet.still_path,
-          vote_average: epDet.vote_average || 0,
-        });
-      } catch {
-        continue;
+      // 2) Sort descending by watchedAt
+      entries.sort(
+        (a, b) =>
+          new Date(b.watchedAt).getTime() - new Date(a.watchedAt).getTime()
+      );
+
+      // 3) Fetch details for each entry & build EpisodeInfo objects
+      const result: EpisodeInfo[] = [];
+      for (const { showId, season, episode, watchedAt } of entries) {
+        try {
+          const epDet: EpisodeDetail = await getEpisodeDetails(
+            showId,
+            season,
+            episode
+          );
+          const showDet = await getTVShowDetails(showId);
+
+          result.push({
+            showId,
+            showName: showDet.name,
+            poster_path: showDet.poster_path,
+            season,
+            episode,
+            label: `Watched ${watchedAt.split("T")[0]}`,
+            episodeTitle: epDet.name,
+            episodeOverview: epDet.overview,
+            air_date: epDet.air_date,
+            still_path: epDet.still_path,
+            vote_average: epDet.vote_average || 0,
+          });
+        } catch {
+          continue;
+        }
       }
+
+      setWatchedHistory(result);
+    };
+
+    buildHistory();
+  }, [episodesWatchedMap]);
+
+  // ─────────────────────────────────────────────────────────────
+  // 5) Once the watchedHistory array is populated, scroll down
+  //    by its container’s height so “Watch Next” sits at top.
+  // ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (
+      !historyInitialized &&
+      historyContainerRef.current !== null &&
+      scrollRef.current !== null
+    ) {
+      // push scroll down by the height of the history container
+      scrollRef.current.scrollTop = historyContainerRef.current.offsetHeight;
+      setHistoryInitialized(true);
     }
+  }, [watchedHistory, historyInitialized]);
 
-    setWatchedHistory(result);
-  };
-
-  buildHistory();
-}, [episodesWatchedMap]);
-
-// ─────────────────────────────────────────────────────────────
-// 5) Once the watchedHistory array is populated, scroll down
-//    by its container’s height so “Watch Next” sits at top.
-// ─────────────────────────────────────────────────────────────
-useEffect(() => {
-  if (
-    !historyInitialized &&
-    historyContainerRef.current !== null &&
-    scrollRef.current !== null
-  ) {
-    // push scroll down by the height of the history container
-    scrollRef.current.scrollTop = historyContainerRef.current.offsetHeight;
-    setHistoryInitialized(true);
-  }
-}, [watchedHistory, historyInitialized]);
-
-useLayoutEffect(() => {
-  // As soon as historyCount grows, measure how much taller the history
-  // container became and shift scrollTop downward by that delta.
-  if (
-    historyContainerRef.current !== null &&
-    scrollRef.current !== null &&
-    prevHistoryHeightRef.current !== null &&
-    historyCount <= 10
-  ) {
-    const newHeight = historyContainerRef.current.scrollHeight;
-    const delta = newHeight - prevHistoryHeightRef.current;
-    scrollRef.current.scrollTop += delta;
-  }
-}, [historyCount]);
+  useLayoutEffect(() => {
+    // As soon as historyCount grows, measure how much taller the history
+    // container became and shift scrollTop downward by that delta.
+    if (
+      historyContainerRef.current !== null &&
+      scrollRef.current !== null &&
+      prevHistoryHeightRef.current !== null &&
+      historyCount <= 10
+    ) {
+      const newHeight = historyContainerRef.current.scrollHeight;
+      const delta = newHeight - prevHistoryHeightRef.current;
+      scrollRef.current.scrollTop += delta;
+    }
+  }, [historyCount]);
 
   /**
    * When user clicks “✔️” to mark this episode as watched:
@@ -740,65 +739,65 @@ useLayoutEffect(() => {
   };
 
   // ─────────────────────────────────────────────────────────────
-// Helper: render one “History” card (grayed out, ✓ already watched)
-// ─────────────────────────────────────────────────────────────
-const renderHistoryCard = (epi: EpisodeInfo) => {
-  const epiKey = `hist-${epi.showId}-${epi.season}-${epi.episode}`;
-  return (
-    <div
-      key={epiKey}
-      style={{
-        ...styles.epiCard,
-        backgroundColor: "#2a2a2a",
-      }}
-      onClick={() => setModalEpisode(epi)}
-    >
-      {epi.poster_path ? (
-        <img
-          src={`${POSTER_BASE_URL}${epi.poster_path}`}
-          alt={epi.showName}
-          style={styles.epiPoster}
-        />
-      ) : (
-        <div style={styles.noImage}>No Image</div>
-      )}
-
-      <div style={styles.epiInfo}>
-        <span style={{ ...styles.showName, color: "#bbb" }}>
-          {epi.showName}
-        </span>
-        <span style={{ ...styles.epiLabel, color: "#aaa" }}>
-          {epi.label}
-        </span>
-        {epi.episodeTitle && (
-          <span style={{ ...styles.epiTitle, color: "#ccc" }}>
-            {epi.episodeTitle}
-          </span>
-        )}
-      </div>
-
-      {/* green “✓” that lets you unwatch */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          const confirmUnwatch = window.confirm(
-            "This episode is already marked as watched. Do you want to unwatch it?"
-          );
-          if (confirmUnwatch) {
-            unmarkAsWatched(epi);
-          }
-        }}
+  // Helper: render one “History” card (grayed out, ✓ already watched)
+  // ─────────────────────────────────────────────────────────────
+  const renderHistoryCard = (epi: EpisodeInfo) => {
+    const epiKey = `hist-${epi.showId}-${epi.season}-${epi.episode}`;
+    return (
+      <div
+        key={epiKey}
         style={{
-          ...styles.cardWatchBtn,      // same base as “mark as watched”
-          backgroundColor: "#28a745",  // green
-          color: "#fff",               // white checkmark
+          ...styles.epiCard,
+          backgroundColor: "#2a2a2a",
         }}
+        onClick={() => setModalEpisode(epi)}
       >
-        ✓
-      </button>
-    </div>
-  );
-};
+        {epi.poster_path ? (
+          <img
+            src={`${POSTER_BASE_URL}${epi.poster_path}`}
+            alt={epi.showName}
+            style={styles.epiPoster}
+          />
+        ) : (
+          <div style={styles.noImage}>No Image</div>
+        )}
+
+        <div style={styles.epiInfo}>
+          <span style={{ ...styles.showName, color: "#bbb" }}>
+            {epi.showName}
+          </span>
+          <span style={{ ...styles.epiLabel, color: "#aaa" }}>
+            {epi.label}
+          </span>
+          {epi.episodeTitle && (
+            <span style={{ ...styles.epiTitle, color: "#ccc" }}>
+              {epi.episodeTitle}
+            </span>
+          )}
+        </div>
+
+        {/* green “✓” that lets you unwatch */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            const confirmUnwatch = window.confirm(
+              "This episode is already marked as watched. Do you want to unwatch it?"
+            );
+            if (confirmUnwatch) {
+              unmarkAsWatched(epi);
+            }
+          }}
+          style={{
+            ...styles.cardWatchBtn,      // same base as “mark as watched”
+            backgroundColor: "#28a745",  // green
+            color: "#fff",               // white checkmark
+          }}
+        >
+          ✓
+        </button>
+      </div>
+    );
+  };
 
   // ─────────────────────────────────────────────────────────────
   // Helper: render the card for one episode in the scroll list
@@ -876,463 +875,465 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
   };
 
   return (
-       <>
-     {/* ───── Top “Watch List / Upcoming” bar ───── */}
-     <nav style={topNavStyles.container}>
-       <button
-         onClick={() => setActiveTab(0)}
-         style={
-           activeTab === 0
-             ? topNavStyles.activeTab
-             : topNavStyles.tab
-         }
-       >
-         {/* (optional: add an icon to match main menu style) */}
-         <span style={topNavStyles.label}>Watch List</span>
-       </button>
-       <button
-         onClick={() => setActiveTab(1)}
-         style={
-           activeTab === 1
-             ? topNavStyles.activeTab
-             : topNavStyles.tab
-         }
-       >
-         <span style={topNavStyles.label}>Upcoming</span>
-       </button>
-     </nav>
-
-     {/* ───── Content area ───── */}
-     {/* Add paddingTop so content starts below the fixed top nav */}
-     <div
-       ref={scrollRef}
-       className="scrollable"
-       style={{
-         ...styles.container,
-         paddingTop: `${topTabBarHeight}px`,
-         paddingBottom: "9rem", // unchanged from before
-       }}
-       onScroll={(e) => {
-  const target = e.target as HTMLElement;
-  const curr = target.scrollTop;
-
-  // If we scrolled up into the top 50px and still have more history to show…
-  if (curr < 50 && lastScrollTop.current > curr) {
-    if (historyCount < watchedHistory.length) {
-      // 1) Record how tall the “history” container is *right now*:
-      if (historyContainerRef.current) {
-        prevHistoryHeightRef.current = historyContainerRef.current.scrollHeight;
-      }
-
-      // 2) Now bump the count by 5. After React re-renders,
-      //    useLayoutEffect (below) will shift the scroll by the right delta.
-      setHistoryCount((prev) => prev + 5);
-    }
-  }
-
-  lastScrollTop.current = curr;
-}}
-     >
-       {/* ─ Tab Buttons for Watch List/Upcoming are now removed here because we moved them up */}
-       {/* ─ Error Banner ─ */}
-      {error && <p style={styles.error}>{error}</p>}
-
-      {/* ─────────── “Watched History” Section (new) ─────────── */}
-      {activeTab === 0 && watchedHistory.length > 0 && (
-  <div
-    ref={historyContainerRef}
-    style={{ marginBottom: "1.5rem" }}
-  >
-    <div style={styles.sectionBadge}>
-            <span style={styles.sectionBadgeText}>WATCH HISTORY</span>
-          </div>
-    {[...watchedHistory.slice(0, historyCount)]
-  .reverse()
-  .map((epi) => renderHistoryCard(epi))}
-  </div>
-)}
-
-
-      {/* ─────────── “Watch Next” Section ─────────── */}
-      {activeTab === 0 && watchNextList.length > 0 && (
-        <div style={styles.section}>
-          <div style={styles.sectionBadge}>
-            <span style={styles.sectionBadgeText}>WATCH NEXT</span>
-          </div>
-          {watchNextList.map((epi) => renderEpisodeCard(epi))}
-        </div>
-      )}
-
-      {/* ─────────── “Haven’t Watched For A While” Section ─────────── */}
-      {activeTab === 0 && watchedAWhileList.length > 0 && (
-        <div style={styles.section}>
-          <div style={styles.sectionBadge}>
-            <span style={styles.sectionBadgeText}>HAVEN’T WATCHED FOR A WHILE</span>
-          </div>
-          {watchedAWhileList.map((epi) => renderEpisodeCard(epi))}
-        </div>
-      )}
-
-      {/* ─────────── “Haven’t Started” Section ─────────── */}
-      {activeTab === 0 && notStartedList.length > 0 && (
-        <div style={styles.section}>
-          <div style={styles.sectionBadge}>
-            <span style={styles.sectionBadgeText}>HAVEN’T STARTED</span>
-          </div>
-          {notStartedList.map((epi) => renderEpisodeCard(epi))}
-        </div>
-      )}
-
-      {activeTab === 0 &&
-        watchNextList.length === 0 &&
-        watchedAWhileList.length === 0 &&
-        notStartedList.length === 0 && (
-          <p style={styles.emptyText}>Your watch list is empty.</p>
-        )}
-
-      {/* ─────────── “Upcoming” Tab ─────────── */}
-      {activeTab === 1 && (
-        <div style={styles.section}>
-          <div style={styles.sectionHeader}>UPCOMING</div>
-          {upcomingList.map((epi) => renderEpisodeCard(epi))}
-          {upcomingList.length === 0 && (
-            <p style={styles.emptyText}>No upcoming episodes.</p>
-          )}
-        </div>
-      )}
-
-      {/* ─────────── Modal / Popup ─────────── */}
-      {modalEpisode && (
-        <div
-          style={styles.modalOverlay}
-          onClick={() => setModalEpisode(null)}
-        >
-          {/* ─────────── Left Arrow (outside modalContent) ─────────── */}
-          <button
-            style={styles.modalArrowLeft}
-            onClick={async (e) => {
-              e.stopPropagation();
-              if (!modalEpisode) return;
-
-              const { showId, season, episode } = modalEpisode;
-              let prevSeason = season;
-              let prevEpisode = episode - 1;
-              let prevEpDetail: EpisodeDetail | null = null;
-
-              // 1) Try (same season, episode−1):
-              if (prevEpisode >= 1) {
-                try {
-                  prevEpDetail = await getEpisodeDetails(
-                    showId,
-                    prevSeason,
-                    prevEpisode
-                  );
-                } catch {
-                  prevEpDetail = null;
-                }
-              }
-
-              // 2) If not found, attempt “last episode of (season−1)”:
-              if (!prevEpDetail && season > 1) {
-                const candidateSeason = season - 1;
-                try {
-                  const seasonInfo = await getSeasonDetails(showId, candidateSeason);
-                  // Find the maximum episode_number in that season
-                  const lastEpNum = Math.max(
-                    ...seasonInfo.episodes.map((e) => e.episode_number)
-                  );
-                  prevSeason = candidateSeason;
-                  prevEpisode = lastEpNum;
-                  prevEpDetail = await getEpisodeDetails(
-                    showId,
-                    prevSeason,
-                    prevEpisode
-                  );
-                } catch {
-                  prevEpDetail = null;
-                }
-              }
-
-              // 3) If we found previous, open it in modal:
-              if (prevEpDetail) {
-                const showDet = await getTVShowDetails(showId);
-                setModalEpisode({
-                  showId,
-                  showName: showDet.name,
-                  poster_path: showDet.poster_path,
-                  season: prevSeason,
-                  episode: prevEpisode,
-                  label: `S${prevSeason} E${prevEpisode}`,
-                  episodeTitle: prevEpDetail.name,
-                  episodeOverview: prevEpDetail.overview,
-                  air_date: prevEpDetail.air_date,
-                  still_path: prevEpDetail.still_path,
-                  vote_average: prevEpDetail.vote_average || 0,
-                });
-              }
-            }}
-          >
-            ◀
-          </button>
-
-          <div
-            style={styles.modalContent}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* ─────────── Top‐Left “Back to Show” Button ─────────── */}
-            <button
-              style={styles.modalBackButton}
-              onClick={() => {
-                window.location.href = "/shows";
-              }}
-            >
-              ← Back to Show
-            </button>
-
-            {/* ─────────── Episode Banner Image + Overlay ─────────── */}
-            <div style={styles.modalImageWrapper}>
-              {modalEpisode.still_path ? (
-                <img
-                  src={`${STILL_BASE_URL}${modalEpisode.still_path}`}
-                  alt={modalEpisode.showName}
-                  style={styles.modalStill}
-                />
-              ) : (
-                <div style={styles.modalNoImage}>No Image</div>
-              )}
-              {/* Overlay: Season/Episode + Title */}
-              <div style={styles.modalOverlayText}>
-                <span style={styles.modalOverlaySE}>
-                  S{modalEpisode.season} | E{modalEpisode.episode}
-                </span>
-                {modalEpisode.episodeTitle && (
-                  <span style={styles.modalOverlayTitle}>
-                    {modalEpisode.episodeTitle}
-                  </span>
-                )}
-              </div>
-            </div>
-
-                        {/* ─────────── “Where to Watch” Section ─────────── */}
-            <div style={styles.modalWhereToWatchSection}>
-              <h3 style={styles.modalWhereToWatchHeader}>Where to watch</h3>
-
-              {modalProviders.length > 0 ? (
-  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-    {modalProviders.map((prov) => {
-      // Compute a brand color based on provider_name:
-      let bgColor = "#222"; // default dark gray
-
-      const name = prov.provider_name.toLowerCase();
-      if (name.includes("netflix")) {
-        bgColor = "#e50914";       // Netflix red
-      } else if (name.includes("disney")) {
-        bgColor = "#0072d2";       // Disney blue
-      } else if (name.includes("prime")) {
-        bgColor = "#00a8e1";       // Prime Video light-blue
-      } else if (name.includes("hulu")) {
-        bgColor = "#1ce783";       // Hulu green
-      } else if (name.includes("hbo")) {
-        bgColor = "#343434";       // HBO charcoal
-      } else if (name.includes("crunchyroll")) {
-        bgColor = "#f27c00";       // Crunchyroll orange
-      }
-      // (Add more cases here if needed.)
-
-      return (
-        <a
-          key={prov.provider_id}
-          href={modalProvidersLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            ...styles.modalProviderButton,
-            backgroundColor: bgColor,
-            // Remove backgroundImage entirely—no logos anymore
-          }}
-        >
-          {prov.provider_name}
-        </a>
-      );
-    })}
-  </div>
-) : (
-  <p style={{ color: "#aaa", fontSize: "14px" }}>
-    No streaming providers found in your region.
-  </p>
-)}
-
-
-            </div>
-
-            {/* ─────────── Episode Info Section ─────────── */}
-            <div style={styles.modalInfo}>
-              {/* ─── Air Date / “Not watched”~“Watched on” / Rating / ✓ button ─── */}
-              <div style={styles.modalAirRatingRow}>
-  {/* ─── Calendar icon + formatted air date ─── */}
-  <Calendar size={16} color="#bbb" style={{ marginRight: "-3px" }} />
-  <span style={styles.modalAirDateText}>
-    {modalEpisode.air_date
-      ? formatPrettyDate(modalEpisode.air_date)
-      : "Unknown"}
-  </span>
-
-  {/* ─── Eye icon + Watched/Not watched ─── */}
-  {(() => {
-    const watchedEntries = episodesWatchedMap[modalEpisode.showId] || [];
-    const match = watchedEntries.find(
-      (we) =>
-        we.season === modalEpisode.season &&
-        we.episode === modalEpisode.episode
-    );
-
-    // If watched, eye icon is green; if not, eye icon is red.
-    const eyeColor = match ? "#28a745" : "#ff6666";
-
-    return (
-      <>
-        <Eye
-          size={16}
-          color={eyeColor}
-          style={{ marginLeft: "0.5rem", marginRight: "1px" }}
-        />
-        <span
+    <>
+      {/* ───── Top “Watch List / Upcoming” bar ───── */}
+      <nav style={topNavStyles.container}>
+        <button
+          onClick={() => setActiveTab(0)}
           style={
-            match
-              ? { ...styles.notWatchedOrDate, color: "#28a745" }
-              : styles.notWatchedOrDate
+            activeTab === 0
+              ? topNavStyles.activeTab
+              : topNavStyles.tab
           }
         >
-          {match
-            ? formatPrettyDate(match.watchedAt.split("T")[0])
-            : "Not watched"}
-        </span>
-      </>
-    );
-  })()}
+          {/* (optional: add an icon to match main menu style) */}
+          <span style={topNavStyles.label}>Watch List</span>
+        </button>
+        <button
+          onClick={() => setActiveTab(1)}
+          style={
+            activeTab === 1
+              ? topNavStyles.activeTab
+              : topNavStyles.tab
+          }
+        >
+          <span style={topNavStyles.label}>Upcoming</span>
+        </button>
+      </nav>
 
-  {/* ─── Rating percentage ─── */}
-  <p style={{...styles.modalRatingPercent, color: ratingColor(modalEpisode.vote_average), marginLeft: "2rem",}}>
-    {Math.round(modalEpisode.vote_average * 10)}%
-  </p>
+      {/* ───── Content area ───── */}
+      {/* Add paddingTop so content starts below the fixed top nav */}
+      <div
+        ref={scrollRef}
+        className="scrollable"
+        style={{
+          ...styles.container,
+          paddingTop: `${topTabBarHeight}px`,
+          paddingBottom: "9rem", // unchanged from before
+        }}
+        onScroll={(e) => {
+          const target = e.target as HTMLElement;
+          const curr = target.scrollTop;
 
-  {/* ─── “Mark as Watched” button (unchanged) ─── */}
-  {(() => {
-    const watchedEntries = episodesWatchedMap[modalEpisode.showId] || [];
-    const isAlready = watchedEntries.some(
-      (we) =>
-        we.season === modalEpisode.season &&
-        we.episode === modalEpisode.episode
-    );
-    return (
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          if (!isAlready) {
-            markAsWatched(modalEpisode);
-          } else {
-            const confirmUnwatch = window.confirm(
-              "This episode is already marked as watched. Do you want to unwatch it?"
-            );
-            if (confirmUnwatch) {
-              unmarkAsWatched(modalEpisode);
+          // If we scrolled up into the top 50px and still have more history to show…
+          if (curr < 50 && lastScrollTop.current > curr) {
+            if (historyCount < watchedHistory.length) {
+              // 1) Record how tall the “history” container is *right now*:
+              if (historyContainerRef.current) {
+                prevHistoryHeightRef.current = historyContainerRef.current.scrollHeight;
+              }
+
+              // 2) Now bump the count by 5. After React re-renders,
+              //    useLayoutEffect (below) will shift the scroll by the right delta.
+              setHistoryCount((prev) => prev + 5);
             }
           }
+
+          lastScrollTop.current = curr;
         }}
-        style={
-          isAlready
-            ? {
-                ...styles.cardWatchBtn,
-                backgroundColor: "#28a745",
-                color: "#ffffff",
-              }
-            : styles.cardWatchBtn
-        }
       >
-        ✓
-      </button>
-    );
-  })()}
-</div>
+        {/* ─ Error Banner ─ */}
+        {error && <p style={styles.error}>{error}</p>}
 
-              {/* Full Episode Overview */}
-              {modalEpisode.episodeOverview && (
-                <div style={styles.modalOverviewSection}>
-                  <h4 style={styles.modalOverviewHeader}>Episode Info</h4>
-                  <p style={styles.modalOverviewText}>
-                    {modalEpisode.episodeOverview}
-                  </p>
-                </div>
-              )}
+        {/* ─────────── “Watched History” Section (new) ─────────── */}
+        {activeTab === 0 && watchedHistory.length > 0 && (
+          <div
+            ref={historyContainerRef}
+            style={{ marginBottom: "1.5rem" }}
+          >
+            <div style={styles.sectionBadge}>
+              <span style={styles.sectionBadgeText}>WATCH HISTORY</span>
             </div>
+            {[...watchedHistory.slice(0, historyCount)]
+              .reverse()
+              .map((epi) => renderHistoryCard(epi))}
           </div>
+        )}
 
-          {/* ─────────── Right Arrow (outside modalContent) ─────────── */}
-          <button
-            style={styles.modalArrowRight}
-            onClick={async (e) => {
-              e.stopPropagation();
-              if (!modalEpisode) return;
+        {/* ─────────── “Watch Next” Section ─────────── */}
+        {activeTab === 0 && watchNextList.length > 0 && (
+          <div style={styles.section}>
+            <div style={styles.sectionBadge}>
+              <span style={styles.sectionBadgeText}>WATCH NEXT</span>
+            </div>
+            {watchNextList.map((epi) => renderEpisodeCard(epi))}
+          </div>
+        )}
 
-              const { showId, season, episode } = modalEpisode;
-              let nextSeason = season;
-              let nextEpisode = episode + 1;
-              let nextEpDetail: EpisodeDetail | null = null;
+        {/* ─────────── “Haven’t Watched For A While” Section ─────────── */}
+        {activeTab === 0 && watchedAWhileList.length > 0 && (
+          <div style={styles.section}>
+            <div style={styles.sectionBadge}>
+              <span style={styles.sectionBadgeText}>HAVEN’T WATCHED FOR A WHILE</span>
+            </div>
+            {watchedAWhileList.map((epi) => renderEpisodeCard(epi))}
+          </div>
+        )}
 
-              // 1) Try (same season, episode+1):
-              try {
-                nextEpDetail = await getEpisodeDetails(
-                  showId,
-                  nextSeason,
-                  nextEpisode
-                );
-              } catch {
-                nextEpDetail = null;
+        {/* ─────────── “Haven’t Started” Section ─────────── */}
+        {activeTab === 0 && notStartedList.length > 0 && (
+          <div style={styles.section}>
+            <div style={styles.sectionBadge}>
+              <span style={styles.sectionBadgeText}>HAVEN’T STARTED</span>
+            </div>
+            {notStartedList.map((epi) => renderEpisodeCard(epi))}
+          </div>
+        )}
+
+        {activeTab === 0 &&
+          watchNextList.length === 0 &&
+          watchedAWhileList.length === 0 &&
+          notStartedList.length === 0 && (
+            <p style={styles.emptyText}>Your watch list is empty.</p>
+          )}
+
+        {/* ─────────── “Upcoming” Tab ─────────── */}
+        {activeTab === 1 && (
+          <div style={styles.section}>
+            <div style={styles.sectionHeader}>UPCOMING</div>
+            {upcomingList.map((epi) => renderEpisodeCard(epi))}
+            {upcomingList.length === 0 && (
+              <p style={styles.emptyText}>No upcoming episodes.</p>
+            )}
+          </div>
+        )}
+
+        {/* ─────────── Modal / Popup ─────────── */}
+        {modalEpisode && (
+  <div
+    style={styles.modalOverlay}
+    onClick={() => setModalEpisode(null)}
+  >
+    {/* ─────────── Left Arrow (outside modalContent) ─────────── */}
+    <button
+      style={styles.modalArrowLeft}
+      onClick={async (e) => {
+        e.stopPropagation();
+        if (!modalEpisode) return;
+
+        const { showId, season, episode } = modalEpisode;
+        let prevSeason = season;
+        let prevEpisode = episode - 1;
+        let prevEpDetail: EpisodeDetail | null = null;
+
+        // 1) Try (same season, episode−1):
+        if (prevEpisode >= 1) {
+          try {
+            prevEpDetail = await getEpisodeDetails(
+              showId,
+              prevSeason,
+              prevEpisode
+            );
+          } catch {
+            prevEpDetail = null;
+          }
+        }
+
+        // 2) If not found, attempt “last episode of (season−1)”:
+        if (!prevEpDetail && season > 1) {
+          const candidateSeason = season - 1;
+          try {
+            const seasonInfo = await getSeasonDetails(showId, candidateSeason);
+            // Find the maximum episode_number in that season
+            const lastEpNum = Math.max(
+              ...seasonInfo.episodes.map((e) => e.episode_number)
+            );
+            prevSeason = candidateSeason;
+            prevEpisode = lastEpNum;
+            prevEpDetail = await getEpisodeDetails(
+              showId,
+              prevSeason,
+              prevEpisode
+            );
+          } catch {
+            prevEpDetail = null;
+          }
+        }
+
+        // 3) If we found previous, open it in modal:
+        if (prevEpDetail) {
+          const showDet = await getTVShowDetails(showId);
+          setModalEpisode({
+            showId,
+            showName: showDet.name,
+            poster_path: showDet.poster_path,
+            season: prevSeason,
+            episode: prevEpisode,
+            label: `S${prevSeason} E${prevEpisode}`,
+            episodeTitle: prevEpDetail.name,
+            episodeOverview: prevEpDetail.overview,
+            air_date: prevEpDetail.air_date,
+            still_path: prevEpDetail.still_path,
+            vote_average: prevEpDetail.vote_average || 0,
+          });
+        }
+      }}
+    >
+      ◀
+    </button>
+
+    {/* ─────────── Modal Content ─────────── */}
+    <div
+      style={styles.modalContent}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* ─────────── Top‐Left “Back to Show” Button ─────────── */}
+      <button
+        style={styles.modalBackButton}
+        onClick={() => {
+          window.location.href = "/shows";
+        }}
+      >
+        ← Back to Show
+      </button>
+
+      {/* ─────────── Episode Banner Image + Overlay ─────────── */}
+      <div style={styles.modalImageWrapper}>
+        {modalEpisode.still_path ? (
+          <img
+            src={`${STILL_BASE_URL}${modalEpisode.still_path}`}
+            alt={modalEpisode.showName}
+            style={styles.modalStill}
+          />
+        ) : (
+          <div style={styles.modalNoImage}>No Image</div>
+        )}
+        {/* Overlay: Season/Episode + Title */}
+        <div style={styles.modalOverlayText}>
+          <span style={styles.modalOverlaySE}>
+            S{modalEpisode.season} | E{modalEpisode.episode}
+          </span>
+          {modalEpisode.episodeTitle && (
+            <span style={styles.modalOverlayTitle}>
+              {modalEpisode.episodeTitle}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ─────────── “Where to Watch” Section ─────────── */}
+      <div style={styles.modalWhereToWatchSection}>
+        <h3 style={styles.modalWhereToWatchHeader}>Where to watch</h3>
+
+        {modalProviders.length > 0 ? (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+            {modalProviders.map((prov) => {
+              // Compute a brand color based on provider_name:
+              let bgColor = "#222"; // default dark gray
+
+              const name = prov.provider_name.toLowerCase();
+              if (name.includes("netflix")) {
+                bgColor = "#e50914"; // Netflix red
+              } else if (name.includes("disney")) {
+                bgColor = "#0072d2"; // Disney blue
+              } else if (name.includes("prime")) {
+                bgColor = "#00a8e1"; // Prime Video light-blue
+              } else if (name.includes("hulu")) {
+                bgColor = "#1ce783"; // Hulu green
+              } else if (name.includes("hbo")) {
+                bgColor = "#343434"; // HBO charcoal
+              } else if (name.includes("crunchyroll")) {
+                bgColor = "#f27c00"; // Crunchyroll orange
               }
+              // (Add more cases here if needed.)
 
-              // 2) If not found, attempt “season+1, episode=1” (provided it exists):
-              if (!nextEpDetail) {
-                const showDet = await getTVShowDetails(showId);
-                if (season < showDet.number_of_seasons) {
-                  // attempt next season’s first episode
-                  nextSeason = season + 1;
-                  nextEpisode = 1;
-                  try {
-                    nextEpDetail = await getEpisodeDetails(
-                      showId,
-                      nextSeason,
-                      nextEpisode
-                    );
-                  } catch {
-                    nextEpDetail = null;
+              return (
+                <a
+                  key={prov.provider_id}
+                  href={modalProvidersLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    ...styles.modalProviderButton,
+                    backgroundColor: bgColor,
+                  }}
+                >
+                  {prov.provider_name}
+                </a>
+              );
+            })}
+          </div>
+        ) : (
+          <p style={{ color: "#aaa", fontSize: "14px" }}>
+            No streaming providers found in your region.
+          </p>
+        )}
+      </div>
+
+      {/* ─────────── Episode Info Section ─────────── */}
+      <div style={styles.modalInfo}>
+        {/* ─── Air Date / Watched‐Status / Rating / ✓ button ─── */}
+        <div style={styles.modalAirRatingRow}>
+          {/* ─── Calendar icon + formatted air date ─── */}
+          <Calendar size={16} color="#bbb" style={{ marginRight: "-3px" }} />
+          <span style={styles.modalAirDateText}>
+            {modalEpisode.air_date
+              ? formatPrettyDate(modalEpisode.air_date)
+              : "Unknown"}
+          </span>
+
+          {/* ─── Eye icon + Watched/Not watched ─── */}
+          {(() => {
+            const watchedEntries = episodesWatchedMap[modalEpisode.showId] || [];
+            const match = watchedEntries.find(
+              (we) =>
+                we.season === modalEpisode.season &&
+                we.episode === modalEpisode.episode
+            );
+
+            // If watched, eye icon is green; if not, eye icon is red.
+            const eyeColor = match ? "#28a745" : "#ff6666";
+
+            return (
+              <>
+                <Eye
+                  size={16}
+                  color={eyeColor}
+                  style={{ marginLeft: "0.5rem", marginRight: "1px" }}
+                />
+                <span
+                  style={
+                    match
+                      ? { ...styles.notWatchedOrDate, color: "#28a745" }
+                      : styles.notWatchedOrDate
                   }
-                }
-              }
+                >
+                  {match
+                    ? formatPrettyDate(match.watchedAt.split("T")[0])
+                    : "Not watched"}
+                </span>
+              </>
+            );
+          })()}
 
-              // 3) If we found next, open it in modal:
-              if (nextEpDetail) {
-                const showDet = await getTVShowDetails(showId);
-                setModalEpisode({
-                  showId,
-                  showName: showDet.name,
-                  poster_path: showDet.poster_path,
-                  season: nextSeason,
-                  episode: nextEpisode,
-                  label: `S${nextSeason} E${nextEpisode}`,
-                  episodeTitle: nextEpDetail.name,
-                  episodeOverview: nextEpDetail.overview,
-                  air_date: nextEpDetail.air_date,
-                  still_path: nextEpDetail.still_path,
-                  vote_average: nextEpDetail.vote_average || 0,
-                });
-              }
+          {/* ─── Rating percentage ─── */}
+          <p
+            style={{
+              ...styles.modalRatingPercent,
+              color: ratingColor(modalEpisode.vote_average),
+              marginLeft: "2rem",
             }}
           >
-            ▶
-          </button>
+            {Math.round(modalEpisode.vote_average * 10)}%
+          </p>
+
+          {/* ─── “Mark as Watched” button ─── */}
+          {(() => {
+            const watchedEntries = episodesWatchedMap[modalEpisode.showId] || [];
+            const isAlready = watchedEntries.some(
+              (we) =>
+                we.season === modalEpisode.season &&
+                we.episode === modalEpisode.episode
+            );
+            return (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!isAlready) {
+                    markAsWatched(modalEpisode);
+                  } else {
+                    const confirmUnwatch = window.confirm(
+                      "This episode is already marked as watched. Do you want to unwatch it?"
+                    );
+                    if (confirmUnwatch) {
+                      unmarkAsWatched(modalEpisode);
+                    }
+                  }
+                }}
+                style={
+                  isAlready
+                    ? {
+                        ...styles.cardWatchBtn,
+                        backgroundColor: "#28a745",
+                        color: "#ffffff",
+                      }
+                    : styles.cardWatchBtn
+                }
+              >
+                ✓
+              </button>
+            );
+          })()}
         </div>
-      )}
+
+        {/* ─────────── Episode Overview ─────────── */}
+        {modalEpisode.episodeOverview && (
+          <div style={styles.modalOverviewSection}>
+            <h4 style={styles.modalOverviewHeader}>Episode Info</h4>
+            <p style={styles.modalOverviewText}>
+              {modalEpisode.episodeOverview}
+            </p>
+          </div>
+        )}
+      </div>
     </div>
+
+    {/* ─────────── Right Arrow (outside modalContent) ─────────── */}
+    <button
+      style={styles.modalArrowRight}
+      onClick={async (e) => {
+        e.stopPropagation();
+        if (!modalEpisode) return;
+
+        const { showId, season, episode } = modalEpisode;
+        let nextSeason = season;
+        let nextEpisode = episode + 1;
+        let nextEpDetail: EpisodeDetail | null = null;
+
+        // 1) Try (same season, episode+1):
+        try {
+          nextEpDetail = await getEpisodeDetails(
+            showId,
+            nextSeason,
+            nextEpisode
+          );
+        } catch {
+          nextEpDetail = null;
+        }
+
+        // 2) If not found, attempt “season+1, episode=1” (provided it exists):
+        if (!nextEpDetail) {
+          const showDet = await getTVShowDetails(showId);
+          if (season < showDet.number_of_seasons) {
+            nextSeason = season + 1;
+            nextEpisode = 1;
+            try {
+              nextEpDetail = await getEpisodeDetails(
+                showId,
+                nextSeason,
+                nextEpisode
+              );
+            } catch {
+              nextEpDetail = null;
+            }
+          }
+        }
+
+        // 3) If we found next, open it in modal:
+        if (nextEpDetail) {
+          const showDet = await getTVShowDetails(showId);
+          setModalEpisode({
+            showId,
+            showName: showDet.name,
+            poster_path: showDet.poster_path,
+            season: nextSeason,
+            episode: nextEpisode,
+            label: `S${nextSeason} E${nextEpisode}`,
+            episodeTitle: nextEpDetail.name,
+            episodeOverview: nextEpDetail.overview,
+            air_date: nextEpDetail.air_date,
+            still_path: nextEpDetail.still_path,
+            vote_average: nextEpDetail.vote_average || 0,
+          });
+        }
+      }}
+    >
+      ▶
+    </button>
+  </div>
+)}
+
+      </div>
     </>
   );
 }
@@ -1350,14 +1351,14 @@ const styles: { [key: string]: React.CSSProperties } = {
   tabContainer: {
     position: "sticky",
     top: 0,
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
-  height: "64px",
-  backgroundColor: "#111", 
-  zIndex: 10,
-},
-tabInactive: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    height: "64px",
+    backgroundColor: "#111",
+    zIndex: 10,
+  },
+  tabInactive: {
     // exactly like TabsLayout.tsx .tab
     display: "flex",
     flexDirection: "column" as const,
@@ -1392,20 +1393,20 @@ tabInactive: {
     transition: "color 0.2s, border-bottom 0.2s",
     cursor: "pointer",
   },
-tabButton: {
-  background: "none",
-  border: "none",
-  color: "#fff",
-  fontSize: "1rem",
-  fontWeight: "bold",
-  textTransform: "uppercase",
-  padding: "0.5rem 1rem",        // match your other menu’s padding
-  cursor: "pointer",
-  transition: "color 0.2s ease",
-},
-tabButtonActive: {
-  color: "#e50914",              // red text for the active tab
-},
+  tabButton: {
+    background: "none",
+    border: "none",
+    color: "#fff",
+    fontSize: "1rem",
+    fontWeight: "bold",
+    textTransform: "uppercase",
+    padding: "0.5rem 1rem",        // match your other menu’s padding
+    cursor: "pointer",
+    transition: "color 0.2s ease",
+  },
+  tabButtonActive: {
+    color: "#e50914",              // red text for the active tab
+  },
 
   error: {
     color: "#ff4d4f",
@@ -1433,7 +1434,7 @@ tabButtonActive: {
     color: "#ffffff",
     fontSize: "0.75rem",
     fontWeight: "bold",
-    padding: "4px 12px",        
+    padding: "4px 12px",
     borderRadius: "999px",       // fully rounded pill shape
     whiteSpace: "nowrap",        // prevent wrapping
     border: "1px solid #666666",
@@ -1548,13 +1549,13 @@ tabButtonActive: {
     zIndex: 9999,
   },
   modalContent: {
+    position: "relative",   // Make this the positioning context
     backgroundColor: "#121212",
     borderRadius: "8px",
     width: "90%",
     maxWidth: "600px",
     maxHeight: "90%",
     overflowY: "auto",
-    position: "relative",
     boxSizing: "border-box",
   },
 
@@ -1645,29 +1646,21 @@ tabButtonActive: {
     fontSize: "0.9rem",
     cursor: "pointer",
   },
-    // ────────────────────────────────────────────────────────────────────────────
-  // Provider‐button style (each streaming‐service “pill”)
-  // ────────────────────────────────────────────────────────────────────────────
+  // ─────────── “Where to Watch” pill buttons ───────────
   modalProviderButton: {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "0.5rem 1rem",
-  backgroundColor: "#222",
-  color: "#fff",
-  textDecoration: "none",
-  borderRadius: "4px",
-  fontSize: "14px",
-  minWidth: "100px",
-  height: "40px",
-  backgroundRepeat: "no-repeat",
-  backgroundPosition: "center left",
-  backgroundSize: "24px 24px",
-  paddingLeft: "14px",
-  transition: "background-color 0.2s",
-},
-
-
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "0.5rem 1rem",
+    backgroundColor: "#222",
+    color: "#fff",
+    textDecoration: "none",
+    borderRadius: "4px",
+    fontSize: "14px",
+    minWidth: "100px",
+    height: "40px",
+    transition: "background-color 0.2s",
+  },
 
   // ────────────────────────────────────────────────────────────────────────────
   // Episode Info row: Air date / “Not watched” or watched date / Rating / ✓ button
@@ -1697,8 +1690,8 @@ tabButtonActive: {
   // “Not watched” or watched date:
   notWatchedOrDate: {
     fontSize: "0.9rem",
-    color: "#ff6666", // red if “Not watched”
-    margin: -3,
+    color: "#ff6666",
+    margin: 0,
   },
   modalAirDate: {
     fontSize: "0.9rem",
@@ -1707,7 +1700,6 @@ tabButtonActive: {
   },
   modalRatingPercent: {
     fontSize: "0.9rem",
-    color: "#ffff00", // yellow/gold font for rating percentage
     margin: 0,
   },
 
@@ -1732,41 +1724,39 @@ tabButtonActive: {
     color: "#ddd",
   },
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // “Previous” Arrow (left)
-  // ────────────────────────────────────────────────────────────────────────────
-  modalArrowLeft: {
-    position: "absolute",
-    top: "calc(50% - 20px)",
-    left: "20px",
-    backgroundColor: "rgba(255,255,255,0.8)",
-    border: "none",
-    color: "#000",
-    fontSize: "1.5rem",
-    lineHeight: 1,
-    width: "40px",
-    height: "40px",
-    borderRadius: "50%",
-    cursor: "pointer",
-    zIndex: 3,
-  },
+  // ─────────── “Previous” Arrow ───────────
+modalArrowLeft: {
+  position: "absolute",
+  top: "50%",
+  left: "355px",               // was "-20px", now closer
+  transform: "translateY(-50%)", // vertically center
+  backgroundColor: "rgba(255,255,255,0.8)",
+  border: "none",
+  color: "#000",
+  fontSize: "1.5rem",
+  lineHeight: 1,
+  width: "40px",
+  height: "40px",
+  borderRadius: "50%",
+  cursor: "pointer",
+  zIndex: 3,
+},
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // “Next” Arrow (right)
-  // ────────────────────────────────────────────────────────────────────────────
-  modalArrowRight: {
-    position: "absolute",
-    top: "calc(50% - 20px)",
-    right: "20px",
-    backgroundColor: "rgba(255,255,255,0.8)",
-    border: "none",
-    color: "#000",
-    fontSize: "1.5rem",
-    lineHeight: 1,
-    width: "40px",
-    height: "40px",
-    borderRadius: "50%",
-    cursor: "pointer",
-    zIndex: 3,
-  },
+// ─────────── “Next” Arrow ───────────
+modalArrowRight: {
+  position: "absolute",
+  top: "50%",
+  right: "355px",              // was "-20px", now closer
+  transform: "translateY(-50%)", // vertically center
+  backgroundColor: "rgba(255,255,255,0.8)",
+  border: "none",
+  color: "#000",
+  fontSize: "1.5rem",
+  lineHeight: 1,
+  width: "40px",
+  height: "40px",
+  borderRadius: "50%",
+  cursor: "pointer",
+  zIndex: 3,
+},
 };
