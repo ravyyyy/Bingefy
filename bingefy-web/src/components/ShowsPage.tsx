@@ -1212,7 +1212,7 @@ const renderHistoryCard = (epi: EpisodeInfo) => {
   })()}
 
   {/* ─── Rating percentage ─── */}
-  <p style={{...styles.modalRatingPercent, color: ratingColor(modalEpisode.vote_average),}}>
+  <p style={{...styles.modalRatingPercent, color: ratingColor(modalEpisode.vote_average), marginLeft: "2rem",}}>
     {Math.round(modalEpisode.vote_average * 10)}%
   </p>
 
@@ -1682,7 +1682,7 @@ tabButtonActive: {
   modalAirRatingRow: {
     display: "flex",
     alignItems: "center",
-    gap: "0.75rem",
+    gap: "1rem",
     marginBottom: "1rem",
     position: "relative",
   },
