@@ -1799,12 +1799,8 @@ export default function ShowsPage() {
                         }}
                         style={
                           isAlready
-                            ? {
-                                ...styles.cardWatchBtn,
-                                backgroundColor: "#28a745",
-                                color: "#ffffff",
-                              }
-                            : styles.cardWatchBtn
+                            ? styles.modalWatchedBadge
+                            : styles.modalWatchBtn
                         }
                       >
                         ✓
@@ -1995,7 +1991,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     alignItems: "flex-start",
     backgroundColor: "#181818",
     borderRadius: "6px",
-    padding: "0.5rem",
+    padding: "0.5rem 3rem 0.5rem 0.5rem",
     marginBottom: "0.5rem",
     position: "relative",
   },
@@ -2047,6 +2043,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     display: "flex",
     flexDirection: "column",
     flexGrow: 1,
+    paddingRight: "80px",
   },
 
   // In-card watch button styles (used in both the list and in the modal):
@@ -2078,6 +2075,40 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontSize: "1.2rem",
     lineHeight: 1,
     cursor: "pointer",
+  },
+
+  // ─── NEW: “same look, but for inside the modal” ───
+  modalWatchBtn: {
+    position: "absolute",
+    // push it a bit up/left compared to the in-card version:
+    top: "8px",         // <-- adjust as needed
+    right: "8px",       // <-- adjust as needed
+    backgroundColor: "#ffffff",
+    border: "none",
+    borderRadius: "50%",
+    width: "56px",
+    height: "56px",
+    color: "#000000",
+    fontSize: "1.2rem",
+    lineHeight: 1,
+    cursor: "pointer",
+    transition: "background-color 0.3s ease",
+    zIndex: 5,          // make sure it floats above text
+  },
+  modalWatchedBadge: {
+    position: "absolute",
+    top: "8px",        // <-- same offset in modal for consistency
+    right: "8px",
+    backgroundColor: "#28a745", 
+    border: "none",
+    borderRadius: "50%",
+    width: "56px",
+    height: "56px",
+    color: "#fff",
+    fontSize: "1.2rem",
+    lineHeight: 1,
+    cursor: "pointer",
+    zIndex: 5,
   },
 
   // Modal / Popup Styling
