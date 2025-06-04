@@ -16,7 +16,7 @@ import type { DocumentData } from "firebase/firestore";
 import { getTVWatchProviders, type WatchProvidersResponse } from "../services/tmdbClients";
 import { Calendar, Eye } from "lucide-react";
 
-const POSTER_BASE_URL = "https://image.tmdb.org/t/p/w300";   // for card posters
+const POSTER_BASE_URL = "https://image.tmdb.org/t/p/w300";    // for card posters
 const STILL_BASE_URL = "https://image.tmdb.org/t/p/original"; // for modal stills
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -43,7 +43,6 @@ interface EpisodeInfo {
   air_date: string;         // from EpisodeDetail.air_date (“YYYY-MM-DD”)
   still_path: string | null;// from EpisodeDetail.still_path
   vote_average: number;     // from EpisodeDetail.vote_average (0–10 scale)
-  // (Optionally, you could add providerNames: string[] or airTime: string if you fetch them)
 }
 
 const topTabBarHeight = 64; // must match your main menu height
@@ -191,9 +190,7 @@ export default function ShowsPage() {
   const [onboardedIds, setOnboardedIds] = useState<number[]>([]);
 
   // Mapping: showId → array of WatchedEntry
-  const [episodesWatchedMap, setEpisodesWatchedMap] = useState<
-    Record<number, WatchedEntry[]>
-  >({});
+  const [episodesWatchedMap, setEpisodesWatchedMap] = useState< Record<number, WatchedEntry[]> >({});
 
   // Three lists for the “Watch List” tab
   const [watchNextList, setWatchNextList] = useState<EpisodeInfo[]>([]);
@@ -203,27 +200,56 @@ export default function ShowsPage() {
   // One list for the “Watched History” above Watch Next
   const [watchedHistory, setWatchedHistory] = useState<EpisodeInfo[]>([]);
   const [historyCount, setHistoryCount] = useState(5);
-  const lastScrollTop = useRef(0);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const historyContainerRef = useRef<HTMLDivElement>(null);
   const prevHistoryHeightRef = useRef<number>(0);
   const [historyInitialized, setHistoryInitialized] = useState(false);
 
-  // ─────────── Required for “modal” functionality ───────────
+  // One list for the “Upcoming” tab
+  const [upcomingList, setUpcomingList] = useState<EpisodeInfo[]>([]);
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Group upcomingList by weekday vs. “Later” so JSX can use it
+  // ─────────────────────────────────────────────────────────────────────────────
+  const groupedUpcoming: Record<string, EpisodeInfo[]> = {};
+  if (upcomingList.length > 0) {
+    const today = new Date();
+    const oneWeekLater = new Date(today);
+    oneWeekLater.setDate(today.getDate() + 7);
+
+    for (const epi of upcomingList) {
+      const epDate = new Date(epi.air_date);
+      let header: string;
+      if (epDate <= oneWeekLater) {
+        header = epDate.toLocaleDateString(undefined, { weekday: "long" });
+      } else {
+        header = "Later";
+      }
+      if (!groupedUpcoming[header]) {
+        groupedUpcoming[header] = [];
+      }
+      groupedUpcoming[header].push(epi);
+    }
+  }
+
+  // ─────────── Required for modal functionality ───────────
   const [seasonEpisodes, setSeasonEpisodes] = useState<number[]>([]);
-  const [modalProviders, setModalProviders] = useState<
-    Array<{ provider_name: string; logo_path: string; provider_id: number }>
-  >([]);
+  const [modalProviders, setModalProviders] = useState< Array<{ provider_name: string; logo_path: string; provider_id: number }> >([]);
   const [modalProvidersLink, setModalProvidersLink] = useState<string>("");
 
-  // ─────────────────────────────────────────────────────────────────────────────
+  // Modal state: the episode clicked on (null = no modal open)
+  const [modalEpisode, setModalEpisode] = useState<EpisodeInfo | null>(null);
+  const [animatingIds, setAnimatingIds] = useState<Set<string>>(new Set());
+
+  const [error, setError] = useState<string | null>(null);
+
+  // ─────────────────────────────────────────────────────────────
   // Hold the user’s country code (derived from IP) in state
-  // ─────────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────
   const [geoCountry, setGeoCountry] = useState<string>("");
 
-  // ─────────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────
   // On mount: fetch geolocation (country code) based on IP
-  // ─────────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
       try {
@@ -246,42 +272,6 @@ export default function ShowsPage() {
       setHistoryInitialized(false);
     }
   }, [activeTab]);
-
-  // One list for the “Upcoming” tab
-  const [upcomingList, setUpcomingList] = useState<EpisodeInfo[]>([]);
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // Group upcomingList by weekday vs. “Later” so JSX can use it
-  // ─────────────────────────────────────────────────────────────────────────────
-  const groupedUpcoming: Record<string, EpisodeInfo[]> = {};
-  if (upcomingList.length > 0) {
-    const today = new Date();
-    const oneWeekLater = new Date(today);
-    oneWeekLater.setDate(today.getDate() + 7);
-
-    for (const epi of upcomingList) {
-      const epDate = new Date(epi.air_date);
-      let header: string;
-
-      // If within next 7 days, group by weekday name
-      if (epDate <= oneWeekLater) {
-        header = epDate.toLocaleDateString(undefined, { weekday: "long" });
-      } else {
-        header = "Later";
-      }
-
-      if (!groupedUpcoming[header]) {
-        groupedUpcoming[header] = [];
-      }
-      groupedUpcoming[header].push(epi);
-    }
-  }
-
-  // Modal state: the episode clicked on (null = no modal open)
-  const [modalEpisode, setModalEpisode] = useState<EpisodeInfo | null>(null);
-  const [animatingIds, setAnimatingIds] = useState<Set<string>>(new Set());
-
-  const [error, setError] = useState<string | null>(null);
 
   // ─────────────────────────────────────────────────────────────
   // 1) Fetch “showsOnboarded” + “episodesWatched” from Firestore
@@ -366,7 +356,7 @@ export default function ShowsPage() {
                 vote_average: epDet.vote_average || 0,
               });
             } catch {
-              // skip if S1E1 does not exist
+              // skip if S1E1 doesn’t exist
             }
             continue;
           }
@@ -388,8 +378,7 @@ export default function ShowsPage() {
           // Determine if watched recently or long ago
           const latestWatched = uniqueEntries.sort(
             (a, b) =>
-              new Date(b.watchedAt).getTime() -
-              new Date(a.watchedAt).getTime()
+              new Date(b.watchedAt).getTime() - new Date(a.watchedAt).getTime()
           )[0];
 
           if (new Date(latestWatched.watchedAt) > new Date(thirtyDaysAgo)) {
@@ -498,11 +487,16 @@ export default function ShowsPage() {
   // ─────────────────────────────────────────────────────────────
   // 4) Build “Past Episodes” = all episodes with air_date < today,
   //    across every season of every show in your watch list.
-  //    Then sort by descending air_date. Lazy‐load 5 at a time,
+  //    Sort by descending air_date. Lazy‐load 5 at a time,
   //    newest first, and greyed‐out like “Watch History.”
   // ─────────────────────────────────────────────────────────────
   const [pastEpisodes, setPastEpisodes] = useState<EpisodeInfo[]>([]);
   const [pastCount, setPastCount] = useState(5);
+
+  // Refs & state for scroll‐preserve in “Past Episodes”
+  const pastContainerRef = useRef<HTMLDivElement>(null);
+  const prevPastHeightRef = useRef<number>(0);
+  const [pastInitialized, setPastInitialized] = useState(false);
 
   useEffect(() => {
     if (onboardedIds.length === 0) {
@@ -513,10 +507,8 @@ export default function ShowsPage() {
     (async () => {
       try {
         const today = new Date().toISOString().split("T")[0]; // “YYYY-MM-DD”
-        const allPastEpisodes: EpisodeInfo[] = [];
+        const allPast: EpisodeInfo[] = [];
 
-        // For each show, iterate every season & episode,
-        // push only if air_date < today
         await Promise.all(
           onboardedIds.map(async (showId) => {
             try {
@@ -531,7 +523,7 @@ export default function ShowsPage() {
                   continue;
                 }
                 for (const ep of seasonObj.episodes) {
-                  // TMDB’s SeasonDetail.episodes[] has episode_number & air_date already
+                  // Only collect if air_date exists AND is before today
                   if (ep.air_date && ep.air_date < today) {
                     try {
                       const epDet: EpisodeDetail = await getEpisodeDetails(
@@ -539,10 +531,9 @@ export default function ShowsPage() {
                         seasonNum,
                         ep.episode_number
                       );
-                      const showName = showDet.name;
-                      allPastEpisodes.push({
+                      allPast.push({
                         showId,
-                        showName,
+                        showName: showDet.name,
                         poster_path: showDet.poster_path,
                         season: seasonNum,
                         episode: ep.episode_number,
@@ -560,24 +551,61 @@ export default function ShowsPage() {
                 }
               }
             } catch {
-              // skip show if fetching show details fails
+              // skip this show if getTVShowDetails fails
             }
           })
         );
 
-        // Sort by descending air_date so latest‐aired is first
-        allPastEpisodes.sort((a, b) => {
-          return new Date(b.air_date).getTime() - new Date(a.air_date).getTime();
-        });
+        // Sort in DESCENDING order by air_date (newest first)
+        allPast.sort(
+          (a, b) =>
+            new Date(b.air_date).getTime() - new Date(a.air_date).getTime()
+        );
 
-        setPastEpisodes(allPastEpisodes);
+        setPastEpisodes(allPast);
       } catch (err) {
-        console.error(err);
+        console.error("Failed to build past episodes:", err);
       }
     })();
   }, [onboardedIds]);
 
-  // ────── Whenever `modalEpisode` or `geoCountry` changes, fetch providers ──────
+  // ─────────────────────────────────────────────────────────────
+  // After “pastEpisodes” first populates & Tab 1 is active,
+  // scroll down by pastContainerRef height so “Upcoming” is visible.
+  // ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (
+      activeTab === 1 &&
+      !pastInitialized &&
+      pastContainerRef.current !== null &&
+      scrollRef.current !== null
+    ) {
+      scrollRef.current.scrollTop = pastContainerRef.current.offsetHeight;
+      setPastInitialized(true);
+    }
+  }, [pastEpisodes, pastInitialized, activeTab]);
+
+  // ─────────────────────────────────────────────────────────────
+  // When pastCount increases (i.e. we load 5 more episodes),
+  // compute new height of pastContainerRef, subtract previous height,
+  // and add that delta to scrollRef.scrollTop—so the scroll “sticks”
+  // at the same episode. (Just like Watch History logic.)
+  // ─────────────────────────────────────────────────────────────
+  useLayoutEffect(() => {
+    if (
+      pastInitialized &&
+      pastContainerRef.current !== null &&
+      scrollRef.current !== null
+    ) {
+      const newHeight = pastContainerRef.current.scrollHeight;
+      const delta = newHeight - prevPastHeightRef.current;
+      scrollRef.current.scrollTop += delta;
+    }
+  }, [pastCount, pastInitialized]);
+
+  // ────────────────────────────────────────────────────
+  // Whenever `modalEpisode` or `geoCountry` changes, fetch providers
+  // ────────────────────────────────────────────────────
   useEffect(() => {
     if (!modalEpisode) {
       setModalProviders([]);
@@ -689,10 +717,15 @@ export default function ShowsPage() {
   }, [episodesWatchedMap]);
 
   // ─────────────────────────────────────────────────────────────
-  // 6) After history loads, scroll down by its height so “Watch Next” sits at top
+  // 6) Once “Watched History” first populates & Tab 0 is active,
+  //    scroll down by historyContainerRef height so “Watch Next”
+  //    sits at the top.
   // ─────────────────────────────────────────────────────────────
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const lastScrollTop = useRef(0);
   useEffect(() => {
     if (
+      activeTab === 0 &&
       !historyInitialized &&
       historyContainerRef.current !== null &&
       scrollRef.current !== null
@@ -700,7 +733,7 @@ export default function ShowsPage() {
       scrollRef.current.scrollTop = historyContainerRef.current.offsetHeight;
       setHistoryInitialized(true);
     }
-  }, [watchedHistory, historyInitialized]);
+  }, [watchedHistory, historyInitialized, activeTab]);
 
   useLayoutEffect(() => {
     if (
@@ -922,15 +955,19 @@ export default function ShowsPage() {
 
   // ─────────────────────────────────────────────────────────────
   // Lazy‐load more “Past Episodes” when scrolling near the top
+  // Also handle “Watched History” scroll near top
   // ─────────────────────────────────────────────────────────────
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
     const curr = target.scrollTop;
 
     // If we scroll up into the “Past Episodes” (i.e. curr < 50),
-    // and there are more to show, bump pastCount by 5.
+    // and there are more to show, bump pastCount by 5
     if (curr < 50 && lastScrollTop.current > curr) {
       if (pastCount < pastEpisodes.length) {
+        if (pastContainerRef.current) {
+          prevPastHeightRef.current = pastContainerRef.current.scrollHeight;
+        }
         setPastCount((prev) => prev + 5);
       }
     }
@@ -997,12 +1034,9 @@ export default function ShowsPage() {
         {/* ─ Error Banner ─ */}
         {error && <p style={styles.error}>{error}</p>}
 
-        {/* ─────────── “Watched History” Section (tab 0) ─────────── */}
+        {/* ─────────── “Watch History” Section (tab 0) ─────────── */}
         {activeTab === 0 && watchedHistory.length > 0 && (
-          <div
-            ref={historyContainerRef}
-            style={{ marginBottom: "1.5rem" }}
-          >
+          <div ref={historyContainerRef} style={{ marginBottom: "1.5rem" }}>
             <div style={styles.sectionBadge}>
               <span style={styles.sectionBadgeText}>WATCH HISTORY</span>
             </div>
@@ -1042,6 +1076,7 @@ export default function ShowsPage() {
           </div>
         )}
 
+        {/* If tab 0 is empty */}
         {activeTab === 0 &&
           watchNextList.length === 0 &&
           watchedAWhileList.length === 0 &&
@@ -1049,19 +1084,19 @@ export default function ShowsPage() {
             <p style={styles.emptyText}>Your watch list is empty.</p>
           )}
 
-        {/* ─────────── “Upcoming” Tab (tab 1) ─────────── */}
+        {/* ─────────── “Past Episodes” (lazy-loaded above Upcoming) ─────────── */}
         {activeTab === 1 && (
-          <>
-            {/* ─────────── “Past Episodes” (NEW: above Upcoming) ─────────── */}
-            <div style={{ marginBottom: "2rem" }}>
-              <div style={styles.sectionBadge}>
-                <span style={styles.sectionBadgeText}>PAST EPISODES</span>
-              </div>
-              {pastEpisodes.length === 0 ? (
-                <p style={styles.emptyText}>No past episodes yet.</p>
-              ) : (
-                (() => {
-                  // Build a map: formattedDate -> EpisodeInfo[]
+          <div style={{ marginBottom: "2rem" }}>
+            <div style={styles.sectionBadge}>
+              <span style={styles.sectionBadgeText}>PAST EPISODES</span>
+            </div>
+
+            {pastEpisodes.length === 0 ? (
+              <p style={styles.emptyText}>No past episodes yet.</p>
+            ) : (
+              <div ref={pastContainerRef}>
+                {(() => {
+                  // Group the first `pastCount` episodes by exact “MMM DD, YYYY”
                   const groupedPast: Record<string, EpisodeInfo[]> = {};
                   pastEpisodes.slice(0, pastCount).forEach((epi) => {
                     const dateLabel = formatPrettyDate(epi.air_date);
@@ -1071,7 +1106,14 @@ export default function ShowsPage() {
                     groupedPast[dateLabel].push(epi);
                   });
 
-                  return Object.keys(groupedPast).map((dateLabel) => (
+                  // Sort those date-keys in descending order so newest date appears first
+                  const dateKeysDesc = Object.keys(groupedPast).sort((a, b) => {
+                    const da = new Date(a);
+                    const db = new Date(b);
+                    return db.getTime() - da.getTime();
+                  });
+
+                  return dateKeysDesc.map((dateLabel) => (
                     <div key={dateLabel} style={styles.section}>
                       <div style={styles.sectionBadge}>
                         <span style={styles.sectionBadgeText}>{dateLabel}</span>
@@ -1083,7 +1125,7 @@ export default function ShowsPage() {
                             key={epiKey}
                             style={{
                               ...styles.epiCard,
-                              backgroundColor: "#2a2a2a", // greyed‐out style
+                              backgroundColor: "#2a2a2a", // greyed-out
                             }}
                             onClick={() => setModalEpisode(epi)}
                           >
@@ -1109,17 +1151,19 @@ export default function ShowsPage() {
                                   {epi.episodeTitle}
                                 </span>
                               )}
-                              {/* Full overview */}
                               {epi.episodeOverview && (
                                 <p style={{ ...styles.epiOverview, color: "#ccc" }}>
                                   {epi.episodeOverview}
                                 </p>
                               )}
-                              {/* (Optional placeholder for time / provider) */}
-                              <p style={{ color: "#888", fontSize: "0.8rem", marginTop: "4px" }}>
-                                {/* e.g. “Aired 8:00 PM local time on Netflix” */}
-                                {/* You can replace this with real logic if you fetch it: */}
-                                Aired: {formatPrettyDate(epi.air_date)} • Provider: N/A
+                              <p
+                                style={{
+                                  color: "#888",
+                                  fontSize: "0.8rem",
+                                  marginTop: "4px",
+                                }}
+                              >
+                                Aired: {formatPrettyDate(epi.air_date)} • Provider: —
                               </p>
                             </div>
                           </div>
@@ -1127,16 +1171,21 @@ export default function ShowsPage() {
                       })}
                     </div>
                   ));
-                })()
-              )}
-              {pastCount < pastEpisodes.length && (
-                <p style={{ textAlign: "center", color: "#888", marginTop: "1rem" }}>
-                  Scroll up to load more…
-                </p>
-              )}
-            </div>
+                })()}
+              </div>
+            )}
 
-            {/* ─────────── “Upcoming” (under Past Episodes) ─────────── */}
+            {pastCount < pastEpisodes.length && (
+              <p style={{ textAlign: "center", color: "#888", marginTop: "1rem" }}>
+                Scroll up to load more…
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* ─────────── “Upcoming” (under Past Episodes) ─────────── */}
+        {activeTab === 1 && (
+          <>
             {Object.keys(groupedUpcoming).length === 0 ? (
               <p style={styles.emptyText}>No upcoming episodes.</p>
             ) : (
@@ -1240,7 +1289,7 @@ export default function ShowsPage() {
                     prevEpDetail = null;
                   }
                 }
-                // 2) If not found, try last episode of (season-1)
+                // 2) If not found, try last episode of (season - 1)
                 if (!prevEpDetail && season > 1) {
                   const candidateSeason = season - 1;
                   try {
