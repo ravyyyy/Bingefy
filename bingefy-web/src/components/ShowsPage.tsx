@@ -434,48 +434,70 @@ export default function ShowsPage() {
 
     (async () => {
       try {
-        const today = new Date().toISOString().split("T")[0]; // “YYYY-MM-DD”
-        const upcomingEpisodes: EpisodeInfo[] = [];
+        // (1) Grab “today” in YYYY-MM-DD form
+       const today = new Date().toISOString().split("T")[0];
+       const upcomingEpisodes: EpisodeInfo[] = [];
 
-        await Promise.all(
-          onboardedIds.map(async (showId) => {
-            try {
-              const showDet = await getTVShowDetails(showId);
-              const ne = showDet.next_episode_to_air;
-              if (ne) {
-                const epDet: EpisodeDetail = await getEpisodeDetails(
-                  showId,
-                  ne.season_number,
-                  ne.episode_number
-                );
-                if (epDet.air_date >= today) {
-                  upcomingEpisodes.push({
-                    showId: showDet.id,
-                    showName: showDet.name,
-                    poster_path: showDet.poster_path,
-                    season: ne.season_number,
-                    episode: ne.episode_number,
-                    label: `S${ne.season_number} E${ne.episode_number}`,
-                    episodeTitle: epDet.name,
-                    episodeOverview: epDet.overview,
-                    air_date: epDet.air_date,
-                    still_path: epDet.still_path,
-                    vote_average: epDet.vote_average || 0,
-                  });
-                }
-              }
-            } catch {
-              // skip if details fail
-            }
-          })
-        );
+       // (2) For each onboarded show, walk through every season → every episode
+       await Promise.all(
+         onboardedIds.map(async (showId) => {
+           try {
+             // Fetch show details to know how many seasons exist
+             const showDet = await getTVShowDetails(showId);
+             const totalSeasons = showDet.number_of_seasons || 0;
 
-        // Sort by ascending air_date so nearest date appears first
-        upcomingEpisodes.sort((a, b) => {
-          return new Date(a.air_date).getTime() - new Date(b.air_date).getTime();
-        });
+             // Loop through each season
+             for (let seasonNum = 1; seasonNum <= totalSeasons; seasonNum++) {
+               let seasonObj: SeasonDetail;
+               try {
+                 seasonObj = await getSeasonDetails(showId, seasonNum);
+               } catch {
+                 // Skip if TMDB returns 404 or missing season
+                 continue;
+               }
 
-        setUpcomingList(upcomingEpisodes);
+               // For each episode in that season, check if air_date ≥ today
+               for (const ep of seasonObj.episodes) {
+                 if (ep.air_date && ep.air_date >= today) {
+                   // We have a future (or today’s) episode: fetch full details
+                   try {
+                     const epDet: EpisodeDetail = await getEpisodeDetails(
+                       showId,
+                       seasonNum,
+                       ep.episode_number
+                     );
+                     upcomingEpisodes.push({
+                       showId: showDet.id,
+                       showName: showDet.name,
+                       poster_path: showDet.poster_path,
+                       season: seasonNum,
+                       episode: ep.episode_number,
+                       label: `S${seasonNum} E${ep.episode_number}`,
+                       episodeTitle: epDet.name,
+                       episodeOverview: epDet.overview,
+                       air_date: epDet.air_date,
+                       still_path: epDet.still_path,
+                       vote_average: epDet.vote_average || 0,
+                     });
+                   } catch {
+                     // Skip if getEpisodeDetails fails
+                     continue;
+                   }
+                 }
+               }
+             }
+           } catch {
+             // Skip entire show if getTVShowDetails fails
+           }
+         })
+       );
+
+       // (3) Sort all future episodes by air_date ascending
+       upcomingEpisodes.sort((a, b) => {
+         return new Date(a.air_date).getTime() - new Date(b.air_date).getTime();
+       });
+
+       setUpcomingList(upcomingEpisodes);
       } catch (err) {
         console.error(err);
         setError("Failed to load upcoming episodes.");
