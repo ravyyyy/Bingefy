@@ -290,16 +290,38 @@ export default function ShowsPage() {
     })();
   }, []);
 
-  // Reset “Watch History” lazy loader whenever we revisit tab 0
-  useEffect(() => {
-    if (activeTab === 1) {
-      setHistoryCount(5);
-      setHistoryInitialized(false);
+// ─────────────────────────────────────────────────────────────
+// Whenever `activeTab` changes, reset both tabs’ lazy-loading:
+//   • if tab 0 (“Watch List”), reset watch-history & scroll so “Watch Next” is at top
+//   • if tab 1 (“Upcoming”), reset pastCount to 5 and scrollTop = 0 (show the first of those 5)
+// ─────────────────────────────────────────────────────────────
+useEffect(() => {
+  if (activeTab === 0) {
+    setHistoryCount(5);
+    setHistoryInitialized(false);
+
+    if (scrollRef.current && historyContainerRef.current) {
+      scrollRef.current.scrollTop = historyContainerRef.current.offsetHeight;
+      lastScrollTop.current = scrollRef.current.scrollTop;
     }
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = 0;
-    }
-  }, [activeTab]);
+  } else {
+    setPastCount(5);
+    setPastInitialized(false);
+
+    // We no longer manually set scrollRef.current.scrollTop here.
+    // A separate useLayoutEffect will handle scrolling “Upcoming” into view.
+    lastScrollTop.current = 0;
+  }
+}, [activeTab]);
+
+const upcomingContainerRef = useRef<HTMLDivElement>(null);
+useLayoutEffect(() => {
+  if (activeTab === 1 && upcomingContainerRef.current && scrollRef.current) {
+    // This will make the top of the “Upcoming” block appear at the top
+    // of the scrollable container
+    upcomingContainerRef.current.scrollIntoView({ block: "start" });
+  }
+}, [activeTab, upcomingList]);
 
   // ─────────────────────────────────────────────────────────────
   // 1) Fetch “showsOnboarded” + “episodesWatched” from Firestore
@@ -626,19 +648,6 @@ export default function ShowsPage() {
   // scroll down by pastContainerRef height so “Upcoming” is visible.
   // ─────────────────────────────────────────────────────────────
   const scrollRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (
-      activeTab === 1 &&
-      !pastInitialized &&
-      pastContainerRef.current !== null &&
-      scrollRef.current !== null
-    ) {
-      // Scroll to the bottom of “pastContainerRef” on first load,
-      // so that the very newest past episode is in view
-      scrollRef.current.scrollTop = pastContainerRef.current.offsetHeight;
-      setPastInitialized(true);
-    }
-  }, [pastEpisodes, pastInitialized, activeTab]);
 
   // ─────────────────────────────────────────────────────────────
   // When pastCount increases, preserve scroll position exactly
@@ -1028,6 +1037,7 @@ export default function ShowsPage() {
         }
         setPastCount((prev) => prev + 5);
       }
+      lastScrollTop.current = curr;
     }
 
     // Also handle “Watched History” lazy loading (as before)
@@ -1332,7 +1342,7 @@ export default function ShowsPage() {
 
         {/* ─────────── “Upcoming” (under Past Episodes) ─────────── */}
         {activeTab === 1 && (
-          <>
+          <div ref={upcomingContainerRef}>
             {Object.keys(groupedUpcoming).length === 0 ? (
      <p style={styles.emptyText}>No upcoming episodes.</p>
    ) : (
@@ -1499,8 +1509,9 @@ export default function ShowsPage() {
          </div>
        );
      })
+     
    )}
-          </>
+          </div>
         )}
 
         {/* ─────────── Modal / Popup ─────────── */}
