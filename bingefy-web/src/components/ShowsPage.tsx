@@ -799,17 +799,18 @@ useLayoutEffect(() => {
   }, [watchedHistory, historyInitialized, activeTab]);
 
   useLayoutEffect(() => {
-    if (
-      historyContainerRef.current !== null &&
-      scrollRef.current !== null &&
-      prevHistoryHeightRef.current !== null &&
-      historyCount <= 10
-    ) {
-      const newHeight = historyContainerRef.current.scrollHeight;
-      const delta = newHeight - prevHistoryHeightRef.current;
-      scrollRef.current.scrollTop += delta;
-    }
-  }, [historyCount]);
+  // Only adjust scroll when we’re on the “Watch List” tab (activeTab === 0)
+  if (
+    activeTab === 0 &&
+    historyContainerRef.current !== null &&
+    scrollRef.current !== null &&
+    typeof prevHistoryHeightRef.current === "number"
+  ) {
+    const newHeight = historyContainerRef.current.scrollHeight;
+    const delta = newHeight - prevHistoryHeightRef.current;
+    scrollRef.current.scrollTop += delta;
+  }
+}, [historyCount, activeTab]);
 
   /**
    * When user clicks “✔️” to mark this episode as watched:
@@ -1021,37 +1022,39 @@ useLayoutEffect(() => {
   // Also handle “Watched History” scroll near top
   // ─────────────────────────────────────────────────────────────
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement;
-    const curr = target.scrollTop;
+  const target = e.target as HTMLElement;
+  const curr = target.scrollTop;
 
-    // If we scroll up into the “Past Episodes” (i.e. curr < 50),
-    // and there are more to show, bump pastCount by 5
-    if (curr < 50 && lastScrollTop.current > curr) {
-      if (pastCount < pastEpisodes.length) {
-        if (pastContainerRef.current && scrollRef.current) {
-          prevPastHeightRef.current = pastContainerRef.current.scrollHeight;
-          // ─────────────────────────── UPDATED ───────────────────────────
-          // Capture current scrollTop before new episodes get added:
-          prevScrollTopRef.current = scrollRef.current.scrollTop;
-          // ────────────────────────────────────────────────────────────────
-        }
-        setPastCount((prev) => prev + 5);
-      }
-      lastScrollTop.current = curr;
+  // ── Past‐Episodes (Tab 1) lazy‐load remains unchanged… ──
+  if (
+    activeTab === 1 &&
+    curr < 50 &&
+    lastScrollTop.current > curr &&
+    pastCount < pastEpisodes.length
+  ) {
+    if (pastContainerRef.current && scrollRef.current) {
+      prevPastHeightRef.current = pastContainerRef.current.scrollHeight;
+      prevScrollTopRef.current = scrollRef.current.scrollTop;
     }
+    setPastCount(prev => prev + 5);
+  }
 
-    // Also handle “Watched History” lazy loading (as before)
-    if (curr < 50 && lastScrollTop.current > curr) {
-      if (historyCount < watchedHistory.length) {
-        if (historyContainerRef.current) {
-          prevHistoryHeightRef.current = historyContainerRef.current.scrollHeight;
-        }
-        setHistoryCount((prev) => prev + 5);
-      }
+  // ── Watched‐History (Tab 0) lazy‐load ──
+  if (
+    activeTab === 0 &&
+    curr < 50 &&
+    lastScrollTop.current > curr &&
+    historyCount < watchedHistory.length
+  ) {
+    if (historyContainerRef.current) {
+      // capture the current “height” before we append 5 more items
+      prevHistoryHeightRef.current = historyContainerRef.current.scrollHeight;
     }
+    setHistoryCount(prev => prev + 5);
+  }
 
-    lastScrollTop.current = curr;
-  };
+  lastScrollTop.current = curr;
+};
 
   // Weekday+Later order for rendering upcoming
   const WEEKDAY_ORDER = [
